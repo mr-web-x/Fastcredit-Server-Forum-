@@ -2,8 +2,9 @@
 import {
   CONTENT_LIMITS,
   USER_ROLES,
-  QUESTION_STATUS,
   QUESTION_PRIORITY,
+  REPORT_TARGET_TYPES,
+  REPORT_REASONS,
 } from "../utils/constants.js";
 import { isValidObjectId } from "../utils/helpers.js";
 import { logError } from "../middlewares/logger.js";
@@ -285,17 +286,18 @@ class ValidationService {
       }
 
       // Валидация типа объекта
-      const validTargetTypes = ["question", "answer", "comment"];
-      if (!targetType || !validTargetTypes.includes(targetType)) {
+      if (
+        !targetType ||
+        !Object.values(REPORT_TARGET_TYPES).includes(targetType)
+      ) {
         errors.push({
           field: "targetType",
           message: "Недопустимый тип объекта",
         });
       }
 
-      // Валидация причины
-      const validReasons = ["spam", "inappropriate", "offensive", "other"];
-      if (!reason || !validReasons.includes(reason)) {
+      // Валидация причины жалобы
+      if (!reason || !Object.values(REPORT_REASONS).includes(reason)) {
         errors.push({
           field: "reason",
           message: "Недопустимая причина жалобы",
@@ -328,55 +330,6 @@ class ValidationService {
         errors: [
           { field: "general", message: "Ошибка валидации данных жалобы" },
         ],
-      };
-    }
-  }
-
-  // Валидация пагинации
-  validatePaginationParams(params) {
-    try {
-      const errors = [];
-      let { page = 1, limit = 20 } = params;
-
-      // Валидация и нормализация страницы
-      page = parseInt(page);
-      if (isNaN(page) || page < 1) {
-        page = 1;
-      }
-      if (page > 1000) {
-        // максимальная страница
-        errors.push({
-          field: "page",
-          message: "Номер страницы слишком большой",
-        });
-      }
-
-      // Валидация и нормализация лимита
-      limit = parseInt(limit);
-      if (isNaN(limit) || limit < 1) {
-        limit = 20;
-      }
-      if (limit > 100) {
-        // максимальный лимит
-        limit = 100;
-      }
-
-      return {
-        isValid: errors.length === 0,
-        errors,
-        normalized: { page, limit },
-      };
-    } catch (error) {
-      logError(error, "ValidationService.validatePaginationParams");
-      return {
-        isValid: false,
-        errors: [
-          {
-            field: "general",
-            message: "Ошибка валидации параметров пагинации",
-          },
-        ],
-        normalized: { page: 1, limit: 20 },
       };
     }
   }
@@ -491,7 +444,10 @@ class ValidationService {
       if (!newRole) {
         errors.push({ field: "newRole", message: "Новая роль обязательна" });
       } else if (!Object.values(USER_ROLES).includes(newRole)) {
-        errors.push({ field: "newRole", message: "Недопустимая роль" });
+        errors.push({
+          field: "newRole",
+          message: "Недопустимая роль пользователя",
+        });
       }
 
       // Валидация причины (опционально)
@@ -524,76 +480,60 @@ class ValidationService {
     }
   }
 
-  // Общая функция валидации массива данных
-  validateBatch(dataArray, validationFunction) {
+  // Валидация пагинации
+  validatePaginationData(data) {
     try {
-      const results = [];
+      const errors = [];
+      let { page, limit } = data;
 
-      if (!Array.isArray(dataArray)) {
-        return {
-          isValid: false,
-          errors: [
-            { field: "general", message: "Данные должны быть массивом" },
-          ],
-          results: [],
-        };
-      }
-
-      if (dataArray.length === 0) {
-        return {
-          isValid: false,
-          errors: [
-            { field: "general", message: "Массив данных не может быть пустым" },
-          ],
-          results: [],
-        };
-      }
-
-      if (dataArray.length > 100) {
-        return {
-          isValid: false,
-          errors: [
-            {
-              field: "general",
-              message: "Максимальный размер массива: 100 элементов",
-            },
-          ],
-          results: [],
-        };
-      }
-
-      let hasErrors = false;
-
-      dataArray.forEach((item, index) => {
-        const validation = validationFunction(item);
-        results.push({
-          index,
-          ...validation,
-        });
-
-        if (!validation.isValid) {
-          hasErrors = true;
+      // Валидация страницы
+      if (page !== undefined) {
+        const pageNum = parseInt(page);
+        if (isNaN(pageNum) || pageNum < 1) {
+          errors.push({
+            field: "page",
+            message: "Номер страницы должен быть положительным числом",
+          });
+        } else if (pageNum > 1000) {
+          errors.push({
+            field: "page",
+            message: "Номер страницы не может быть больше 1000",
+          });
         }
-      });
+      }
+
+      // Валидация лимита
+      if (limit !== undefined) {
+        const limitNum = parseInt(limit);
+        if (isNaN(limitNum) || limitNum < 1) {
+          errors.push({
+            field: "limit",
+            message: "Лимит должен быть положительным числом",
+          });
+        } else if (limitNum > 100) {
+          errors.push({
+            field: "limit",
+            message: "Лимит не может быть больше 100",
+          });
+        }
+      }
 
       return {
-        isValid: !hasErrors,
-        errors: hasErrors
-          ? [
-              {
-                field: "general",
-                message: "Некоторые элементы не прошли валидацию",
-              },
-            ]
-          : [],
-        results,
+        isValid: errors.length === 0,
+        errors,
+        normalized: {
+          page: page ? Math.max(1, parseInt(page)) : 1,
+          limit: limit ? Math.min(100, Math.max(1, parseInt(limit))) : 20,
+        },
       };
     } catch (error) {
-      logError(error, "ValidationService.validateBatch");
+      logError(error, "ValidationService.validatePaginationData");
       return {
         isValid: false,
-        errors: [{ field: "general", message: "Ошибка пакетной валидации" }],
-        results: [],
+        errors: [
+          { field: "general", message: "Ошибка валидации данных пагинации" },
+        ],
+        normalized: { page: 1, limit: 20 },
       };
     }
   }

@@ -206,10 +206,8 @@ class QuestionController {
     const { id } = req.params;
     const userId = req.user._id;
 
-    // Импортируем Like модель только здесь чтобы избежать циклических зависимостей
-    const { default: Like } = await import("../models/Like.js");
-
-    const result = await Like.toggleLike(userId, id, "question");
+    // Используем правильный сервис
+    const result = await questionService.toggleQuestionLike(id, userId);
 
     logUserAction(
       userId,
@@ -223,6 +221,7 @@ class QuestionController {
         {
           liked: result.liked,
           action: result.action,
+          likesCount: result.likesCount,
         },
         result.action === "added"
           ? SUCCESS_MESSAGES.LIKE_ADDED
@@ -291,10 +290,11 @@ class QuestionController {
     const options = {
       page,
       limit,
-      author: userId,
+      status: req.query.status || null,
     };
 
-    const questions = await questionService.getQuestions(options);
+    // Используем правильный метод сервиса
+    const questions = await questionService.getUserQuestions(userId, options);
 
     res.json(formatResponse(true, questions, "Вопросы пользователя получены"));
   });
@@ -319,6 +319,21 @@ class QuestionController {
         "Валидация slug выполнена"
       )
     );
+  });
+
+  // Получение топ вопросов (новый метод)
+  getTopQuestions = asyncHandler(async (req, res) => {
+    const { limit = 10, period = 30, sortBy = "likes" } = req.query;
+
+    const options = {
+      limit: parseInt(limit),
+      period: parseInt(period),
+      sortBy,
+    };
+
+    const topQuestions = await questionService.getTopQuestions(options);
+
+    res.json(formatResponse(true, topQuestions, "Топ вопросы получены"));
   });
 }
 

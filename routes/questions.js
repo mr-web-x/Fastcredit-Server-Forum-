@@ -67,6 +67,22 @@ router.get(
   questionController.getQuestionStatistics
 );
 
+// GET /api/questions/top - топ вопросы (НОВЫЙ РОУТ)
+router.get("/top", optionalAuth, questionController.getTopQuestions);
+
+// GET /api/questions/validate-slug/:slug - валидация slug вопроса (ПЕРЕНЕСЕН ВЫШЕ)
+router.get("/validate-slug/:slug", questionController.validateQuestionSlug);
+
+// GET /api/questions/user/:userId - вопросы конкретного пользователя
+router.get(
+  "/user/:userId",
+  authenticate,
+  checkUserBan,
+  validateObjectId("userId"),
+  validatePagination,
+  questionController.getUserQuestions
+);
+
 // POST /api/questions - создание нового вопроса
 router.post(
   "/",
@@ -95,12 +111,6 @@ router.post(
   }),
   questionController.createQuestion
 );
-
-// GET /api/questions/validate-slug/:slug - валидация slug вопроса
-router.get("/validate-slug/:slug", questionController.validateQuestionSlug);
-
-// GET /api/questions/:slug - получение конкретного вопроса
-router.get("/:slug", optionalAuth, questionController.getQuestionBySlug);
 
 // PUT /api/questions/:id - обновление вопроса
 router.put(
@@ -172,14 +182,7 @@ router.put(
   questionController.changeQuestionStatus
 );
 
-// GET /api/questions/user/:userId - вопросы конкретного пользователя
-router.get(
-  "/user/:userId",
-  authenticate,
-  checkUserBan,
-  validateObjectId("userId"),
-  validatePagination,
-  questionController.getUserQuestions
-);
+// GET /api/questions/:slug - получение конкретного вопроса (ПЕРЕНЕСЕН В КОНЕЦ)
+router.get("/:slug", optionalAuth, questionController.getQuestionBySlug);
 
 export default router;

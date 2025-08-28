@@ -7,37 +7,64 @@ import {
   logError,
   logSecurityEvent,
 } from "../middlewares/logger.js";
+import { OAuth2Client } from "google-auth-library";
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 class AuthService {
-  // Верификация токена из внешнего микросервиса авторизации
+  // Верификация токена из внешнего микросервиса (Google ID Token + фолбэк на локальный JWT)
   async verifyExternalToken(token) {
     try {
-      // Здесь будет запрос к внешнему микросервису авторизации
-      // Пока что проверяем JWT токен локально
-      const decoded = jwt.verify(token, config.JWT_SECRET);
+      // 1) Пытаемся проверить как Google ID Token
+      const ticket = await googleClient.verifyIdToken({
+        idToken: token,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      const p = ticket.getPayload();
+
+      // Доп. проверка издателя
+      if (
+        p.iss !== "accounts.google.com" &&
+        p.iss !== "https://accounts.google.com"
+      ) {
+        throw new Error("INVALID_ISSUER");
+      }
+
+      const normalized = {
+        userId: p.sub, // стабильный Google ID
+        email: p.email,
+        isVerified: !!p.email_verified,
+        avatar: p.picture || null,
+        name: p.name || null,
+      };
 
       logUserAction(
-        decoded.userId || decoded.id,
+        normalized.userId,
         "TOKEN_VERIFIED",
-        `External token verified`
+        "Google ID token verified"
       );
 
-      return {
-        success: true,
-        payload: decoded,
-      };
-    } catch (error) {
-      logSecurityEvent(
-        "INVALID_EXTERNAL_TOKEN",
-        `Token verification failed: ${error.message}`,
-        null,
-        null
-      );
-
-      return {
-        success: false,
-        error: error.message,
-      };
+      return { success: true, payload: normalized };
+    } catch (googleErr) {
+      // 2) Фолбэк: поддержим твой старый путь (локальный JWT по JWT_SECRET) — удобно для тестов
+      try {
+        const decoded = jwt.verify(token, config.JWT_SECRET);
+        logUserAction(
+          decoded.userId || decoded.id,
+          "TOKEN_VERIFIED",
+          "Local JWT verified (fallback)"
+        );
+        return { success: true, payload: decoded };
+      } catch (localErr) {
+        logSecurityEvent(
+          "INVALID_EXTERNAL_TOKEN",
+          `Token verification failed: ${
+            googleErr?.message || localErr?.message
+          }`,
+          null,
+          null
+        );
+        return { success: false, error: "INVALID_TOKEN" };
+      }
     }
   }
 
@@ -51,20 +78,26 @@ class AuthService {
       }
 
       const { payload } = verification;
-      const userId = payload.userId || payload.id;
+      const googleId = payload.userId || payload.id; // у Google это sub
       const userEmail = payload.email;
 
-      if (!userId || !userEmail) {
-        throw new Error("Invalid token payload: missing userId or email");
+      if (!googleId || !userEmail) {
+        throw new Error("Invalid token payload: missing googleId or email");
       }
 
-      // Ищем пользователя в нашей базе
-      let user = await User.findById(userId);
+      // 1) Ищем пользователя по googleId
+      let user = await User.findOne({ googleId });
 
-      // Если пользователя нет, создаем его (первый вход)
+      // 2) Если не нашли — ищем по email (например, ранее был зарегистрирован локально)
+      if (!user) {
+        user = await User.findOne({ email: userEmail });
+      }
+
+      // 3) Если не нашли ни по googleId, ни по email — создаём нового
       if (!user) {
         user = await User.create({
-          _id: userId,
+          googleId,
+          provider: "google",
           email: userEmail,
           role: "user", // все регистрируются как обычные пользователи
           isVerified: payload.isVerified || false,
@@ -72,13 +105,17 @@ class AuthService {
         });
 
         logUserAction(
-          userId,
+          user._id,
           "USER_CREATED_FROM_TOKEN",
-          `New user created from external auth: ${userEmail}`
+          `New Google user created: ${userEmail}`
         );
       } else {
-        // Обновляем информацию пользователя при каждом входе
+        // 4) Если нашли, но ещё не привязан googleId — привязываем
         const updateData = {};
+
+        if (!user.googleId) updateData.googleId = googleId;
+        if (!user.provider || user.provider === "local")
+          updateData.provider = "google";
 
         if (payload.email && payload.email !== user.email) {
           updateData.email = payload.email;
@@ -96,16 +133,17 @@ class AuthService {
         }
 
         if (Object.keys(updateData).length > 0) {
-          await User.findByIdAndUpdate(userId, updateData, { new: true });
-          user = await User.findById(userId);
+          user = await User.findByIdAndUpdate(user._id, updateData, {
+            new: true,
+          });
           logUserAction(
-            userId,
+            user._id,
             "USER_UPDATED_FROM_TOKEN",
             `User data updated: ${JSON.stringify(updateData)}`
           );
         }
 
-        // Обновляем время последнего входа
+        // обновляем время последнего входа
         user.lastLoginAt = new Date();
         await user.save({ validateBeforeSave: false });
       }

@@ -42,6 +42,8 @@ class AuthController {
         );
       }
 
+      const internalToken = authService.generateInternalToken(user);
+
       // Возвращаем информацию о пользователе
       const userInfo = await authService.getUserInfo(user._id);
 
@@ -51,7 +53,13 @@ class AuthController {
         "User token verified successfully"
       );
 
-      res.json(formatResponse(true, userInfo, "Токен успешно верифицирован"));
+      res.json(
+        formatResponse(
+          true,
+          { ...userInfo, token: internalToken },
+          "Токен успешно верифицирован"
+        )
+      );
     } catch (error) {
       logSecurityEvent(
         "TOKEN_VERIFICATION_ERROR",
