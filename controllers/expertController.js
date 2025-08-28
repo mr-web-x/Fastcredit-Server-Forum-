@@ -1,0 +1,359 @@
+// controllers/expertController.js
+import userService from "../services/userService.js";
+import answerService from "../services/answerService.js";
+import questionService from "../services/questionService.js";
+import {
+  formatResponse,
+  getPaginationData,
+  isValidObjectId,
+} from "../utils/helpers.js";
+import { ERROR_MESSAGES } from "../utils/constants.js";
+import { asyncHandler } from "../middlewares/errorHandler.js";
+import { logUserAction } from "../middlewares/logger.js";
+
+class ExpertController {
+  // Получение списка всех экспертов (публичный метод)
+  getExperts = asyncHandler(async (req, res) => {
+    const { page, limit } = getPaginationData(req);
+    const { sortBy = "rating", sortOrder = -1 } = req.query;
+
+    const options = {
+      page,
+      limit,
+      sortBy,
+      sortOrder: parseInt(sortOrder),
+    };
+
+    const experts = await userService.getExperts(options);
+
+    res.json(formatResponse(true, experts, "Список экспертов получен"));
+  });
+
+  // Получение профиля конкретного эксперта (публичный метод)
+  getExpertProfile = asyncHandler(async (req, res) => {
+    const { expertId } = req.params;
+
+    // Валидация ID
+    if (!isValidObjectId(expertId)) {
+      return res.status(400).json(
+        formatResponse(false, null, "Неверный формат ID эксперта", {
+          type: "VALIDATION_ERROR",
+          field: "expertId",
+        })
+      );
+    }
+
+    const expert = await userService.getUserById(expertId);
+
+    // Проверяем что пользователь действительно эксперт
+    if (!expert.isExpert) {
+      return res
+        .status(404)
+        .json(formatResponse(false, null, "Эксперт не найден"));
+    }
+
+    // Получаем дополнительную статистику эксперта
+    const [expertAnswers, bestAnswers] = await Promise.all([
+      answerService.getExpertAnswers(expertId, { page: 1, limit: 5 }),
+      answerService.getExpertBestAnswers(expertId, 5),
+    ]);
+
+    const expertProfile = {
+      ...expert.toObject(),
+      recentAnswers: expertAnswers.data,
+      bestAnswers,
+    };
+
+    res.json(formatResponse(true, expertProfile, "Профиль эксперта получен"));
+  });
+
+  // Панель эксперта - общая информация (только для экспертов)
+  getDashboard = asyncHandler(async (req, res) => {
+    const expertId = req.user._id;
+
+    // Получаем статистику эксперта
+    const [pendingQuestions, expertAnswers, bestAnswers, expertInfo] =
+      await Promise.all([
+        questionService.getPendingQuestions({ page: 1, limit: 10 }),
+        answerService.getExpertAnswers(expertId, {
+          page: 1,
+          limit: 5,
+          isApproved: null,
+        }),
+        answerService.getExpertBestAnswers(expertId, 5),
+        userService.getUserById(expertId),
+      ]);
+
+    // Подсчитываем статистику ответов эксперта
+    const pendingAnswersCount = expertAnswers.data.filter(
+      (answer) => !answer.isApproved
+    ).length;
+    const approvedAnswersCount = expertInfo.totalAnswers;
+    const acceptedAnswersCount = expertAnswers.data.filter(
+      (answer) => answer.isAccepted
+    ).length;
+
+    const dashboardData = {
+      expert: {
+        id: expertInfo._id,
+        email: expertInfo.email,
+        avatar: expertInfo.avatar,
+        bio: expertInfo.bio,
+        rating: expertInfo.rating,
+        totalAnswers: expertInfo.totalAnswers,
+        totalQuestions: expertInfo.totalQuestions,
+      },
+      statistics: {
+        pendingAnswers: pendingAnswersCount,
+        approvedAnswers: approvedAnswersCount,
+        acceptedAnswers: acceptedAnswersCount,
+        pendingQuestions: pendingQuestions.pagination.totalItems,
+      },
+      pendingQuestions: pendingQuestions.data,
+      recentAnswers: expertAnswers.data,
+      bestAnswers,
+    };
+
+    res.json(formatResponse(true, dashboardData, "Панель эксперта получена"));
+  });
+
+  // Получение вопросов в ожидании для эксперта
+  getPendingQuestions = asyncHandler(async (req, res) => {
+    const { page, limit } = getPaginationData(req);
+    const { priority } = req.query;
+
+    const options = {
+      page,
+      limit,
+      priority,
+    };
+
+    const questions = await questionService.getPendingQuestions(options);
+
+    res.json(formatResponse(true, questions, "Вопросы в ожидании получены"));
+  });
+
+  // Получение ответов эксперта
+  getMyAnswers = asyncHandler(async (req, res) => {
+    const { page, limit } = getPaginationData(req);
+    const { isApproved } = req.query;
+    const expertId = req.user._id;
+
+    const options = {
+      page,
+      limit,
+      isApproved:
+        isApproved === "true" ? true : isApproved === "false" ? false : null,
+    };
+
+    const answers = await answerService.getExpertAnswers(expertId, options);
+
+    res.json(formatResponse(true, answers, "Ответы эксперта получены"));
+  });
+
+  // Получение лучших ответов эксперта
+  getMyBestAnswers = asyncHandler(async (req, res) => {
+    const { limit = 10 } = req.query;
+    const expertId = req.user._id;
+
+    const bestAnswers = await answerService.getExpertBestAnswers(
+      expertId,
+      parseInt(limit)
+    );
+
+    res.json(
+      formatResponse(true, bestAnswers, "Лучшие ответы эксперта получены")
+    );
+  });
+
+  // Обновление биографии эксперта
+  updateExpertBio = asyncHandler(async (req, res) => {
+    const { bio } = req.body;
+    const expertId = req.user._id;
+
+    // Валидация биографии
+    if (bio && bio.length > 500) {
+      return res.status(400).json(
+        formatResponse(
+          false,
+          null,
+          "Биография не может превышать 500 символов",
+          {
+            type: "VALIDATION_ERROR",
+            field: "bio",
+          }
+        )
+      );
+    }
+
+    const updateData = { bio: bio || null };
+    const updatedExpert = await userService.updateProfile(
+      expertId,
+      updateData,
+      req.user
+    );
+
+    logUserAction(expertId, "EXPERT_BIO_UPDATED", "Expert updated their bio");
+
+    res.json(
+      formatResponse(true, updatedExpert, "Биография эксперта обновлена")
+    );
+  });
+
+  // Получение статистики эксперта (детальная)
+  getExpertStatistics = asyncHandler(async (req, res) => {
+    const { expertId } = req.params;
+    const requesterId = req.user._id;
+
+    // Валидация ID
+    if (!isValidObjectId(expertId)) {
+      return res.status(400).json(
+        formatResponse(false, null, "Неверный формат ID эксперта", {
+          type: "VALIDATION_ERROR",
+          field: "expertId",
+        })
+      );
+    }
+
+    // Эксперт может смотреть только свою статистику, админ - любую
+    if (expertId !== requesterId.toString() && req.user.role !== "admin") {
+      return res
+        .status(403)
+        .json(formatResponse(false, null, ERROR_MESSAGES.FORBIDDEN));
+    }
+
+    const expert = await userService.getUserById(expertId);
+    if (!expert.isExpert) {
+      return res
+        .status(404)
+        .json(formatResponse(false, null, "Эксперт не найден"));
+    }
+
+    // Получаем детальную статистику
+    const answerStats = await answerService.getAnswerStatistics();
+    const expertAnswers = await answerService.getExpertAnswers(expertId, {
+      page: 1,
+      limit: 1000,
+    });
+
+    const expertSpecificStats = {
+      totalAnswers: expert.totalAnswers,
+      rating: expert.rating,
+      answersBreakdown: {
+        approved: expertAnswers.data.filter((a) => a.isApproved).length,
+        pending: expertAnswers.data.filter((a) => !a.isApproved).length,
+        accepted: expertAnswers.data.filter((a) => a.isAccepted).length,
+      },
+      totalLikes: expertAnswers.data.reduce(
+        (sum, answer) => sum + answer.likes,
+        0
+      ),
+      avgLikesPerAnswer:
+        expertAnswers.data.length > 0
+          ? (
+              expertAnswers.data.reduce(
+                (sum, answer) => sum + answer.likes,
+                0
+              ) / expertAnswers.data.length
+            ).toFixed(2)
+          : 0,
+    };
+
+    res.json(
+      formatResponse(true, expertSpecificStats, "Статистика эксперта получена")
+    );
+  });
+
+  // Поиск экспертов по специализации/биографии
+  searchExperts = asyncHandler(async (req, res) => {
+    const { q: query } = req.query;
+    const { page, limit } = getPaginationData(req);
+
+    if (!query || query.trim().length < 2) {
+      return res.status(400).json(
+        formatResponse(
+          false,
+          null,
+          "Поисковый запрос должен содержать минимум 2 символа",
+          {
+            type: "VALIDATION_ERROR",
+            field: "query",
+          }
+        )
+      );
+    }
+
+    const options = {
+      page,
+      limit,
+      role: "expert",
+    };
+
+    const results = await userService.searchUsers(query.trim(), options);
+
+    // Фильтруем только экспертов (дополнительная проверка)
+    const filteredResults = {
+      ...results,
+      data: results.data.filter((user) => user.isExpert),
+    };
+
+    res.json(
+      formatResponse(
+        true,
+        filteredResults,
+        "Результаты поиска экспертов получены"
+      )
+    );
+  });
+
+  // Получение активности эксперта (публичная информация)
+  getExpertActivity = asyncHandler(async (req, res) => {
+    const { expertId } = req.params;
+    const { page, limit } = getPaginationData(req);
+
+    // Валидация ID
+    if (!isValidObjectId(expertId)) {
+      return res.status(400).json(
+        formatResponse(false, null, "Неверный формат ID эксперта", {
+          type: "VALIDATION_ERROR",
+          field: "expertId",
+        })
+      );
+    }
+
+    const expert = await userService.getUserById(expertId);
+    if (!expert.isExpert) {
+      return res
+        .status(404)
+        .json(formatResponse(false, null, "Эксперт не найден"));
+    }
+
+    const options = { page, limit };
+    const activity = await userService.getUserActivity(expertId, options);
+
+    // Возвращаем только публичную информацию
+    const publicActivity = {
+      expert: {
+        id: expert._id,
+        email: expert.email,
+        avatar: expert.avatar,
+        bio: expert.bio,
+        rating: expert.rating,
+        totalAnswers: expert.totalAnswers,
+      },
+      activity: {
+        // Показываем только одобренные ответы в публичной активности
+        answers: activity.activity.answers.filter(
+          (answer) => answer.isApproved
+        ),
+        questions: activity.activity.questions, // вопросы показываем все
+      },
+    };
+
+    res.json(
+      formatResponse(true, publicActivity, "Активность эксперта получена")
+    );
+  });
+}
+
+export default new ExpertController();

@@ -7,6 +7,9 @@ import config from "./config/index.js";
 import logger from "./middlewares/logger.js";
 import { writeLog } from "./middlewares/logger.js";
 
+// Импорт роутов
+import apiRoutes from "./routes/index.js";
+
 // Создаем приложение Express
 const app = express();
 
@@ -107,15 +110,8 @@ app.get("/health", (req, res) => {
   });
 });
 
-// API роуты (будут добавлены позже)
-// app.use('/api/auth', authRoutes);
-// app.use('/api/questions', questionRoutes);
-// app.use('/api/answers', answerRoutes);
-// app.use('/api/comments', commentRoutes);
-// app.use('/api/users', userRoutes);
-// app.use('/api/experts', expertRoutes);
-// app.use('/api/admin', adminRoutes);
-// app.use('/api/reports', reportRoutes);
+// Подключение API роутов
+app.use("/api", apiRoutes);
 
 // 404 handler
 app.use((req, res) => {
