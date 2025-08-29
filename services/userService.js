@@ -3,13 +3,8 @@ import User from "../models/User.js";
 import Question from "../models/Question.js";
 import Answer from "../models/Answer.js";
 import Comment from "../models/Comment.js";
-import RoleChange from "../models/RoleChange.js";
 import { USER_ROLES } from "../utils/constants.js";
-import {
-  logUserAction,
-  logError,
-  logRoleChange,
-} from "../middlewares/logger.js";
+import { logUserAction, logError } from "../middlewares/logger.js";
 import { createPaginationResponse } from "../utils/helpers.js";
 
 class UserService {
@@ -41,6 +36,41 @@ class UserService {
     }
   }
 
+  // Получение пользователя по username (для локальной авторизации)
+  async getUserByUsername(username) {
+    try {
+      const user = await User.findOne({ username, provider: "local" }).select(
+        "-__v"
+      );
+      return user;
+    } catch (error) {
+      logError(error, "UserService.getUserByUsername");
+      throw error;
+    }
+  }
+
+  // Проверка доступности email
+  async isEmailAvailable(email) {
+    try {
+      const existingUser = await User.findOne({ email });
+      return !existingUser;
+    } catch (error) {
+      logError(error, "UserService.isEmailAvailable");
+      throw error;
+    }
+  }
+
+  // Проверка доступности username
+  async isUsernameAvailable(username) {
+    try {
+      const existingUser = await User.findOne({ username });
+      return !existingUser;
+    } catch (error) {
+      logError(error, "UserService.isUsernameAvailable");
+      throw error;
+    }
+  }
+
   // Получение списка пользователей с пагинацией
   async getUsers(options = {}) {
     try {
@@ -48,8 +78,10 @@ class UserService {
         page = 1,
         limit = 20,
         role = null,
+        provider = null,
         isActive = null,
         isBanned = null,
+        isEmailVerified = null,
         search = null,
         sortBy = "createdAt",
         sortOrder = -1,
@@ -60,12 +92,19 @@ class UserService {
 
       // Фильтры
       if (role) query.role = role;
+      if (provider) query.provider = provider;
       if (isActive !== null) query.isActive = isActive;
       if (isBanned !== null) query.isBanned = isBanned;
+      if (isEmailVerified !== null) query.isEmailVerified = isEmailVerified;
 
-      // Поиск по email
+      // Поиск по email, username или имени
       if (search) {
-        query.email = { $regex: search, $options: "i" };
+        query.$or = [
+          { email: { $regex: search, $options: "i" } },
+          { username: { $regex: search, $options: "i" } },
+          { firstName: { $regex: search, $options: "i" } },
+          { lastName: { $regex: search, $options: "i" } },
+        ];
       }
 
       const [users, total] = await Promise.all([
@@ -130,7 +169,7 @@ class UserService {
       }
 
       // Поля, которые может обновлять сам пользователь
-      const userAllowedFields = ["bio", "avatar"];
+      const userAllowedFields = ["bio", "avatar", "firstName", "lastName"];
 
       // Поля, которые может обновлять только админ
       const adminOnlyFields = [
@@ -139,6 +178,7 @@ class UserService {
         "isBanned",
         "bannedUntil",
         "bannedReason",
+        "isEmailVerified",
       ];
 
       const filteredData = {};
@@ -162,6 +202,22 @@ class UserService {
         });
       }
 
+      // Проверка уникальности username если обновляется
+      if (updateData.username && updateData.username !== user.username) {
+        if (isSelf || isAdmin) {
+          const usernameExists = await User.findOne({
+            username: updateData.username,
+            _id: { $ne: userId },
+          });
+
+          if (usernameExists) {
+            throw new Error("Username already taken");
+          }
+
+          filteredData.username = updateData.username;
+        }
+      }
+
       if (Object.keys(filteredData).length === 0) {
         throw new Error("No valid fields to update");
       }
@@ -181,6 +237,11 @@ class UserService {
       return updatedUser;
     } catch (error) {
       logError(error, "UserService.updateProfile", userId);
+
+      if (error.message === "Username already taken") {
+        throw new Error("Имя пользователя уже занято");
+      }
+
       throw error;
     }
   }
@@ -222,6 +283,11 @@ class UserService {
         user: {
           id: user._id,
           email: user.email,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          fullName: user.fullName,
+          provider: user.provider,
           role: user.role,
           avatar: user.avatar,
           bio: user.bio,
@@ -229,6 +295,7 @@ class UserService {
           totalAnswers: user.totalAnswers,
           totalQuestions: user.totalQuestions,
           isExpert: user.isExpert,
+          isEmailVerified: user.isEmailVerified,
           createdAt: user.createdAt,
         },
         activity: {
@@ -246,58 +313,60 @@ class UserService {
   // Получение статистики пользователей
   async getUserStatistics() {
     try {
-      const [
-        totalUsers,
-        activeUsers,
-        experts,
-        admins,
-        bannedUsers,
-        recentUsers,
-      ] = await Promise.all([
-        User.countDocuments(),
-        User.countDocuments({ isActive: true, isBanned: false }),
-        User.countDocuments({ role: USER_ROLES.EXPERT, isActive: true }),
-        User.countDocuments({ role: USER_ROLES.ADMIN, isActive: true }),
-        User.countDocuments({ isBanned: true }),
-        User.countDocuments({
-          createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
-        }),
-      ]);
+      const [totalStats, providerStats, roleStats, verificationStats] =
+        await Promise.all([
+          User.aggregate([
+            {
+              $group: {
+                _id: null,
+                total: { $sum: 1 },
+                active: { $sum: { $cond: ["$isActive", 1, 0] } },
+                banned: { $sum: { $cond: ["$isBanned", 1, 0] } },
+                verified: { $sum: { $cond: ["$isEmailVerified", 1, 0] } },
+              },
+            },
+          ]),
 
-      // Статистика по ролям
-      const roleStats = await User.aggregate([
-        {
-          $group: {
-            _id: "$role",
-            count: { $sum: 1 },
-            active: { $sum: { $cond: ["$isActive", 1, 0] } },
-            banned: { $sum: { $cond: ["$isBanned", 1, 0] } },
-          },
-        },
-      ]);
+          User.aggregate([
+            {
+              $group: {
+                _id: "$provider",
+                count: { $sum: 1 },
+                active: { $sum: { $cond: ["$isActive", 1, 0] } },
+                verified: { $sum: { $cond: ["$isEmailVerified", 1, 0] } },
+              },
+            },
+          ]),
 
-      // Топ экспертов по рейтингу
-      const topExperts = await User.find({
-        role: { $in: [USER_ROLES.EXPERT, USER_ROLES.ADMIN] },
-        isActive: true,
-        totalAnswers: { $gt: 0 },
-      })
-        .select("email avatar rating totalAnswers")
-        .sort({ rating: -1, totalAnswers: -1 })
-        .limit(10);
+          User.getStatistics(),
+
+          User.aggregate([
+            {
+              $group: {
+                _id: {
+                  provider: "$provider",
+                  verified: "$isEmailVerified",
+                },
+                count: { $sum: 1 },
+              },
+            },
+          ]),
+        ]);
 
       return {
-        total: totalUsers,
-        active: activeUsers,
-        experts,
-        admins,
-        banned: bannedUsers,
-        recentRegistrations: recentUsers,
-        byRole: roleStats.reduce((acc, stat) => {
+        total: totalStats[0] || { total: 0, active: 0, banned: 0, verified: 0 },
+        byProvider: providerStats.reduce((acc, stat) => {
           acc[stat._id] = stat;
           return acc;
         }, {}),
-        topExperts,
+        byRole: roleStats,
+        verification: verificationStats.reduce((acc, stat) => {
+          const key = `${stat._id.provider}_${
+            stat._id.verified ? "verified" : "unverified"
+          }`;
+          acc[key] = stat.count;
+          return acc;
+        }, {}),
       };
     } catch (error) {
       logError(error, "UserService.getUserStatistics");
@@ -312,7 +381,12 @@ class UserService {
       const skip = (page - 1) * limit;
 
       const searchQuery = {
-        email: { $regex: query, $options: "i" },
+        $or: [
+          { email: { $regex: query, $options: "i" } },
+          { username: { $regex: query, $options: "i" } },
+          { firstName: { $regex: query, $options: "i" } },
+          { lastName: { $regex: query, $options: "i" } },
+        ],
       };
 
       if (role) {
@@ -321,7 +395,9 @@ class UserService {
 
       const [users, total] = await Promise.all([
         User.find(searchQuery)
-          .select("email role avatar bio totalAnswers totalQuestions createdAt")
+          .select(
+            "email username firstName lastName role avatar bio totalAnswers totalQuestions createdAt provider isEmailVerified"
+          )
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit),
@@ -392,6 +468,82 @@ class UserService {
       return user;
     } catch (error) {
       logError(error, "UserService.updateUserRating", userId);
+      throw error;
+    }
+  }
+
+  // Получение пользователей по provider
+  async getUsersByProvider(provider, options = {}) {
+    try {
+      const { page = 1, limit = 20 } = options;
+      const skip = (page - 1) * limit;
+
+      const [users, total] = await Promise.all([
+        User.find({ provider })
+          .select("-__v")
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit),
+        User.countDocuments({ provider }),
+      ]);
+
+      return createPaginationResponse(users, total, page, limit);
+    } catch (error) {
+      logError(error, "UserService.getUsersByProvider");
+      throw error;
+    }
+  }
+
+  // Получение неподтвержденных пользователей (для админки)
+  async getUnverifiedUsers(options = {}) {
+    try {
+      const { page = 1, limit = 20 } = options;
+      const skip = (page - 1) * limit;
+
+      const [users, total] = await Promise.all([
+        User.find({
+          isEmailVerified: false,
+          provider: "local",
+        })
+          .select("-__v")
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit),
+        User.countDocuments({
+          isEmailVerified: false,
+          provider: "local",
+        }),
+      ]);
+
+      return createPaginationResponse(users, total, page, limit);
+    } catch (error) {
+      logError(error, "UserService.getUnverifiedUsers");
+      throw error;
+    }
+  }
+
+  // Получение заблокированных аккаунтов (брутфорс защита)
+  async getLockedAccounts(options = {}) {
+    try {
+      const { page = 1, limit = 20 } = options;
+      const skip = (page - 1) * limit;
+
+      const [users, total] = await Promise.all([
+        User.find({
+          lockUntil: { $gt: new Date() },
+        })
+          .select("email username lockUntil loginAttempts provider createdAt")
+          .sort({ lockUntil: -1 })
+          .skip(skip)
+          .limit(limit),
+        User.countDocuments({
+          lockUntil: { $gt: new Date() },
+        }),
+      ]);
+
+      return createPaginationResponse(users, total, page, limit);
+    } catch (error) {
+      logError(error, "UserService.getLockedAccounts");
       throw error;
     }
   }
