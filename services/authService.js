@@ -25,179 +25,256 @@ class AuthService {
         idToken: token,
         audience: process.env.GOOGLE_CLIENT_ID,
       });
-      const p = ticket.getPayload();
+      const payload = ticket.getPayload();
 
       // Доп. проверка издателя
       if (
-        p.iss !== "accounts.google.com" &&
-        p.iss !== "https://accounts.google.com"
+        payload.iss !== "accounts.google.com" &&
+        payload.iss !== "https://accounts.google.com"
       ) {
         throw new Error("INVALID_ISSUER");
       }
 
       const normalized = {
-        userId: p.sub, // стабильный Google ID
-        email: p.email,
-        isVerified: !!p.email_verified,
-        avatar: p.picture || null,
-        name: p.name || null,
+        userId: payload.sub, // стабильный Google ID
+        email: payload.email,
+        isVerified: payload.email_verified,
+        firstName: payload.given_name,
+        lastName: payload.family_name,
+        avatar: payload.picture,
+        provider: "google",
       };
 
-      logUserAction(
-        normalized.userId,
-        "TOKEN_VERIFIED",
-        "Google ID token verified"
-      );
-
-      return { success: true, payload: normalized, type: "google" };
-    } catch (googleErr) {
-      // 2) Фолбэк: поддержим локальный JWT по JWT_SECRET
+      return { type: "google", data: normalized };
+    } catch (googleError) {
+      // 2) Если не Google токен, проверяем как локальный JWT
       try {
         const decoded = jwt.verify(token, config.JWT_SECRET);
-        logUserAction(
-          decoded.userId || decoded.id,
-          "TOKEN_VERIFIED",
-          "Local JWT verified (fallback)"
-        );
-        return { success: true, payload: decoded, type: "local" };
-      } catch (localErr) {
-        logSecurityEvent(
-          "INVALID_EXTERNAL_TOKEN",
-          `Token verification failed: ${
-            googleErr?.message || localErr?.message
-          }`,
-          null,
-          null
-        );
-        return { success: false, error: "INVALID_TOKEN" };
+        return { type: "jwt", data: decoded };
+      } catch (jwtError) {
+        if (jwtError.name === "TokenExpiredError") {
+          throw new Error("TOKEN_EXPIRED");
+        }
+        if (jwtError.name === "JsonWebTokenError") {
+          throw new Error("INVALID_TOKEN");
+        }
+        throw new Error("INVALID_TOKEN");
       }
     }
   }
 
-  // Получение или создание пользователя из Google токена (старый метод)
+  // Получение пользователя из токена (ДОБАВЛЕНО - ОТСУТСТВОВАЛО!)
   async getUserFromToken(token) {
     try {
-      const verification = await this.verifyExternalToken(token);
+      const tokenData = await this.verifyExternalToken(token);
 
-      if (!verification.success) {
-        throw new Error(verification.error);
-      }
-
-      const { payload } = verification;
-      const googleId = payload.userId || payload.id; // у Google это sub
-      const userEmail = payload.email;
-
-      if (!googleId || !userEmail) {
-        throw new Error("Invalid token payload: missing googleId or email");
-      }
-
-      // 1) Ищем пользователя по googleId
-      let user = await User.findOne({ googleId }).select("-__v");
-
-      // 2) Если не нашли по googleId, ищем по email (миграция старых пользователей)
-      if (!user) {
-        user = await User.findOne({ email: userEmail }).select("-__v");
-
-        if (user && !user.googleId) {
-          // Привязываем Google ID к существующему аккаунту
-          user.googleId = googleId;
-          user.provider = "google";
-          user.isEmailVerified = true;
-          await user.save();
-
-          logUserAction(
-            user._id,
-            "GOOGLE_LINKED",
-            `Linked Google ID to existing account`
-          );
-        }
-      }
-
-      // 3) Если пользователя вообще нет - создаем нового
-      if (!user) {
-        user = await User.create({
-          googleId,
-          email: userEmail,
-          provider: "google",
-          role: USER_ROLES.USER,
-          isEmailVerified: true,
-          isVerified: true,
-          avatar: payload.avatar,
-          firstName: payload.name?.split(" ")[0],
-          lastName: payload.name?.split(" ").slice(1).join(" "),
-          isActive: true,
+      if (tokenData.type === "google") {
+        // Ищем или создаем Google пользователя
+        let user = await User.findOne({
+          googleId: tokenData.data.userId,
         });
 
-        logUserAction(
-          user._id,
-          "USER_CREATED_GOOGLE",
-          `New user created via Google OAuth`
-        );
-      } else {
-        // 4) Обновляем данные существующего пользователя
-        const updateData = {};
-        if (payload.avatar && user.avatar !== payload.avatar) {
-          updateData.avatar = payload.avatar;
-        }
-        if (!user.isEmailVerified && payload.isVerified) {
-          updateData.isEmailVerified = true;
-          updateData.isVerified = true;
-        }
-
-        if (Object.keys(updateData).length > 0) {
-          user = await User.findByIdAndUpdate(user._id, updateData, {
-            new: true,
+        if (!user) {
+          // Проверяем существование пользователя с таким же email
+          const existingUser = await User.findOne({
+            email: tokenData.data.email,
           });
+
+          if (existingUser) {
+            throw new Error("EMAIL_ALREADY_EXISTS");
+          }
+
+          // Создаем нового Google пользователя
+          user = await User.create({
+            googleId: tokenData.data.userId,
+            email: tokenData.data.email,
+            firstName: tokenData.data.firstName,
+            lastName: tokenData.data.lastName,
+            avatar: tokenData.data.avatar,
+            provider: "google",
+            isEmailVerified: true,
+            isVerified: true,
+            role: USER_ROLES.USER,
+            lastLoginAt: new Date(),
+          });
+
           logUserAction(
             user._id,
-            "USER_UPDATED_FROM_TOKEN",
-            `User data updated: ${JSON.stringify(updateData)}`
+            "GOOGLE_USER_CREATED",
+            `New Google user created: ${user.email}`
           );
+        } else {
+          // Обновляем последний вход
+          user.lastLoginAt = new Date();
+          await user.save();
         }
 
-        // обновляем время последнего входа
-        user.lastLoginAt = new Date();
-        await user.save({ validateBeforeSave: false });
+        return user;
+      } else if (tokenData.type === "jwt") {
+        // Ищем локального пользователя по JWT
+        const user = await User.findById(
+          tokenData.data.userId || tokenData.data.id
+        );
+
+        if (!user) {
+          throw new Error("USER_NOT_FOUND");
+        }
+
+        return user;
       }
 
-      return user;
+      throw new Error("INVALID_TOKEN_TYPE");
     } catch (error) {
       logError(error, "AuthService.getUserFromToken");
       throw error;
     }
   }
 
+  // Проверка статуса пользователя (ДОБАВЛЕНО - ОТСУТСТВОВАЛО!)
+  async validateUserStatus(user) {
+    try {
+      // Проверяем активность аккаунта
+      if (!user.isActive) {
+        return {
+          valid: false,
+          reason: "ACCOUNT_INACTIVE",
+          message: "Аккаунт деактивирован",
+        };
+      }
+
+      // Проверяем блокировку аккаунта
+      if (user.isAccountLocked()) {
+        const lockTimeLeft = Math.ceil(
+          (user.lockUntil - Date.now()) / 1000 / 60
+        );
+        return {
+          valid: false,
+          reason: "ACCOUNT_LOCKED",
+          message: `Аккаунт заблокирован на ${lockTimeLeft} минут`,
+          lockUntil: user.lockUntil,
+        };
+      }
+
+      // Проверяем бан
+      if (user.isBannedCurrently()) {
+        const banInfo = {
+          isPermanent: !user.bannedUntil,
+          bannedUntil: user.bannedUntil,
+          reason: user.bannedReason,
+        };
+
+        return {
+          valid: false,
+          reason: "USER_BANNED",
+          message: user.bannedUntil
+            ? `Пользователь забанен до ${user.bannedUntil.toLocaleString()}`
+            : "Пользователь забанен навсегда",
+          banInfo,
+        };
+      }
+
+      return { valid: true };
+    } catch (error) {
+      logError(error, "AuthService.validateUserStatus");
+      return {
+        valid: false,
+        reason: "VALIDATION_ERROR",
+        message: "Ошибка проверки статуса пользователя",
+      };
+    }
+  }
+
+  // Генерация внутреннего JWT токена (ДОБАВЛЕНО - ОТСУТСТВОВАЛО!)
+  generateInternalToken(user) {
+    try {
+      const payload = {
+        userId: user._id,
+        id: user._id, // для совместимости
+        email: user.email,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified,
+        provider: user.provider,
+        iat: Math.floor(Date.now() / 1000),
+      };
+
+      return jwt.sign(payload, config.JWT_SECRET, {
+        expiresIn: config.JWT_EXPIRATION || "7d",
+        issuer: "fastcredit-forum",
+        audience: "fastcredit-users",
+      });
+    } catch (error) {
+      logError(error, "AuthService.generateInternalToken");
+      throw new Error("Ошибка генерации токена");
+    }
+  }
+
+  // Получение информации о пользователе (ДОБАВЛЕНО - ОТСУТСТВОВАЛО!)
+  async getUserInfo(userId) {
+    try {
+      const user = await User.findById(userId).select("-__v");
+
+      if (!user) {
+        throw new Error("USER_NOT_FOUND");
+      }
+
+      return {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        fullName: user.fullName,
+        displayName: user.displayName,
+        role: user.role,
+        provider: user.provider,
+        isEmailVerified: user.isEmailVerified,
+        isActive: user.isActive,
+        avatar: user.avatar,
+        bio: user.bio,
+        rating: user.rating,
+        totalAnswers: user.totalAnswers,
+        totalQuestions: user.totalQuestions,
+        canAccessFeatures: user.canAccessFeatures(),
+        lastLoginAt: user.lastLoginAt,
+        createdAt: user.createdAt,
+      };
+    } catch (error) {
+      logError(error, "AuthService.getUserInfo");
+      throw error;
+    }
+  }
+
   // ==================== ЛОКАЛЬНАЯ АВТОРИЗАЦИЯ ====================
 
-  // Регистрация нового пользователя
+  // Регистрация локального пользователя (ДОБАВЛЕНО - ОТСУТСТВОВАЛО!)
   async registerUser(userData, requestIP = null) {
     try {
       const { email, password, firstName, lastName, username } = userData;
 
-      // Проверяем существование пользователя по email
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        throw new Error("USER_ALREADY_EXISTS");
+      // Проверяем существование пользователя с таким email
+      const existingEmailUser = await User.findOne({ email });
+      if (existingEmailUser) {
+        throw new Error("EMAIL_EXISTS");
       }
 
-      // Проверяем уникальность username если указан
+      // Проверяем существование пользователя с таким username (если указан)
       if (username) {
-        const existingUsername = await User.findOne({ username });
-        if (existingUsername) {
-          throw new Error("USERNAME_TAKEN");
+        const existingUsernameUser = await User.findOne({ username });
+        if (existingUsernameUser) {
+          throw new Error("USERNAME_EXISTS");
         }
       }
 
-      // Создаем пользователя (пароль автоматически захешируется в pre-save модели)
+      // Создаем пользователя
       const user = await User.create({
         email,
-        password,
+        password, // автоматически хешируется в pre-save middleware
         firstName,
         lastName,
         username,
         provider: "local",
         role: USER_ROLES.USER,
-        isEmailVerified: false, // требует подтверждения email
+        isEmailVerified: false,
         isVerified: false,
         isActive: true,
       });
@@ -205,74 +282,75 @@ class AuthService {
       logUserAction(
         user._id,
         "USER_REGISTERED",
-        `New user registered: ${email}`
+        `New local user registered: ${email}`
       );
 
-      // Отправляем код подтверждения email
-      let verificationResult;
+      // Автоматически отправляем код подтверждения
+      let verificationResult = null;
       try {
         verificationResult =
           await verificationService.sendEmailVerificationCode(email, requestIP);
       } catch (verificationError) {
-        logError(
-          verificationError,
-          "AuthService.registerUser - verification code send failed",
-          user._id
-        );
-        verificationResult = { success: false };
+        logError(verificationError, "AuthService.registerUser - verification");
+        // Не блокируем регистрацию, если код не отправился
       }
 
       return {
         user,
-        verificationSent: verificationResult.success,
-        message: verificationResult.success
-          ? "Пользователь зарегистрирован. Код подтверждения отправлен на email."
-          : "Пользователь зарегистрирован. Ошибка отправки кода подтверждения.",
-        ...(process.env.NODE_ENV === "development" &&
-          verificationResult.devCode && {
-            devCode: verificationResult.devCode, // Для тестирования
-          }),
+        verificationSent: verificationResult?.success || false,
+        message: "Пользователь создан. Проверьте email для подтверждения.",
+        ...(verificationResult?.devCode && {
+          devCode: verificationResult.devCode,
+        }),
       };
     } catch (error) {
       logError(error, "AuthService.registerUser");
 
-      if (error.message === "USER_ALREADY_EXISTS") {
+      if (error.message === "EMAIL_EXISTS") {
         throw new Error("Пользователь с таким email уже существует");
       }
-      if (error.message === "USERNAME_TAKEN") {
-        throw new Error("Имя пользователя уже занято");
+      if (error.message === "USERNAME_EXISTS") {
+        throw new Error("Пользователь с таким username уже существует");
+      }
+      if (error.code === 11000) {
+        // MongoDB duplicate key error
+        if (error.keyPattern?.email) {
+          throw new Error("Email уже занят");
+        }
+        if (error.keyPattern?.username) {
+          throw new Error("Username уже занят");
+        }
       }
 
       throw error;
     }
   }
 
-  // Вход пользователя по email/username + password
-  async loginUser(credentials) {
+  // Вход локального пользователя (ЗАВЕРШАЕМ МЕТОД)
+  async loginUser({ login, password }) {
     try {
-      const { login, password } = credentials; // login может быть email или username
-
       if (!login || !password) {
         throw new Error("LOGIN_PASSWORD_REQUIRED");
       }
 
-      // Ищем пользователя по email или username, включая пароль в выборку
-      const user = await User.findOne({
-        $or: [{ email: login.toLowerCase() }, { username: login }],
-        provider: "local", // только локальные пользователи
-      }).select("+password +loginAttempts +lockUntil");
+      // Ищем пользователя по email или username с паролем
+      const user = await User.findByEmailOrUsername(login, true);
 
       if (!user) {
         logSecurityEvent(
           "LOGIN_FAILED",
-          `Login attempt with non-existent credentials: ${login}`,
+          `Login attempt with non-existent user: ${login}`,
           null
         );
         throw new Error("INVALID_CREDENTIALS");
       }
 
       // Проверяем блокировку аккаунта
-      if (user.isAccountLocked) {
+      if (user.isAccountLocked()) {
+        const lockTimeLeft = Math.ceil(
+          (user.lockUntil - Date.now()) / 1000 / 60
+        );
+
         logSecurityEvent(
           "LOGIN_BLOCKED",
           `Login attempt on locked account: ${user.email}`,
@@ -406,180 +484,78 @@ class AuthService {
       return result;
     } catch (error) {
       logError(error, "AuthService.resetPassword");
-
-      if (error.message.includes("найден")) {
-        throw new Error("Пользователь не найден");
-      }
-
       throw error;
     }
   }
 
-  // ==================== ОБЩИЕ МЕТОДЫ ====================
+  // ==================== УТИЛИТЫ ====================
 
-  // Проверка статуса пользователя после получения из токена
-  async validateUserStatus(user) {
+  // Проверка доступности email
+  async checkEmailAvailability(email) {
     try {
-      // Проверяем активность аккаунта
-      if (!user.isActive) {
-        logSecurityEvent(
-          "INACTIVE_USER_LOGIN",
-          "Inactive user attempted login",
-          user._id
-        );
-        return {
-          valid: false,
-          reason: "ACCOUNT_INACTIVE",
-          message: "Аккаунт деактивирован",
-        };
-      }
-
-      // Проверяем блокировку
-      if (user.isBannedCurrently()) {
-        const banInfo = {
-          reason: user.bannedReason,
-          until: user.bannedUntil,
-          isPermanent: !user.bannedUntil,
-        };
-
-        logSecurityEvent(
-          "BANNED_USER_LOGIN",
-          `Banned user attempted login: ${JSON.stringify(banInfo)}`,
-          user._id
-        );
-
-        return {
-          valid: false,
-          reason: "ACCOUNT_BANNED",
-          message: banInfo.isPermanent
-            ? `Аккаунт заблокирован навсегда. Причина: ${banInfo.reason}`
-            : `Аккаунт заблокирован до ${banInfo.until.toLocaleDateString()}. Причина: ${
-                banInfo.reason
-              }`,
-          banInfo,
-        };
-      }
-
+      const existingUser = await User.findOne({ email });
       return {
-        valid: true,
-        user,
+        available: !existingUser,
+        message: existingUser ? "Email уже занят" : "Email доступен",
       };
     } catch (error) {
-      logError(error, "AuthService.validateUserStatus", user?._id);
+      logError(error, "AuthService.checkEmailAvailability");
       throw error;
     }
   }
 
-  // Генерация JWT токена для внутреннего использования
-  generateInternalToken(user) {
+  // Проверка доступности username
+  async checkUsernameAvailability(username) {
     try {
-      const payload = {
-        userId: user._id,
-        email: user.email,
-        role: user.role,
-        provider: user.provider,
-        isVerified: user.isEmailVerified,
-      };
-
-      const token = jwt.sign(payload, config.JWT_SECRET, {
-        expiresIn: config.JWT_EXPIRES_IN || "24h",
-      });
-
-      logUserAction(
-        user._id,
-        "INTERNAL_TOKEN_GENERATED",
-        "Internal JWT token generated"
-      );
-
-      return token;
-    } catch (error) {
-      logError(error, "AuthService.generateInternalToken", user?._id);
-      throw error;
-    }
-  }
-
-  // Получение информации о пользователе
-  async getUserInfo(userId) {
-    try {
-      const user = await User.findById(userId).select("-__v");
-
-      if (!user) {
-        throw new Error("User not found");
-      }
-
-      // Возвращаем безопасную информацию о пользователе
+      const existingUser = await User.findOne({ username });
       return {
-        id: user._id,
-        email: user.email,
-        username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        fullName: user.fullName,
-        provider: user.provider,
-        role: user.role,
-        isVerified: user.isEmailVerified,
-        avatar: user.avatar,
-        bio: user.bio,
-        rating: user.rating,
-        totalAnswers: user.totalAnswers,
-        totalQuestions: user.totalQuestions,
-        isActive: user.isActive,
-        lastLoginAt: user.lastLoginAt,
-        createdAt: user.createdAt,
-        // Виртуальные поля
-        isExpert: user.isExpert,
-        isAdmin: user.isAdmin,
-        canAnswer: user.canAnswer,
-        canModerate: user.canModerate,
+        available: !existingUser,
+        message: existingUser ? "Username уже занят" : "Username доступен",
       };
     } catch (error) {
-      logError(error, "AuthService.getUserInfo", userId);
+      logError(error, "AuthService.checkUsernameAvailability");
       throw error;
     }
   }
 
-  // Обновление профиля пользователя
+  // Обновление профиля пользователя (ДОБАВЛЕНО - ОТСУТСТВОВАЛО!)
   async updateUserProfile(userId, updateData) {
     try {
       const user = await User.findById(userId);
 
       if (!user) {
-        throw new Error("User not found");
+        throw new Error("USER_NOT_FOUND");
       }
 
-      // Разрешенные поля для обновления обычными пользователями
+      // Разрешенные поля для обновления
       const allowedFields = [
-        "bio",
-        "avatar",
         "firstName",
         "lastName",
         "username",
+        "bio",
+        "avatar",
       ];
-      const filteredData = {};
 
-      allowedFields.forEach((field) => {
+      const updateObject = {};
+      for (const field of allowedFields) {
         if (updateData[field] !== undefined) {
-          filteredData[field] = updateData[field];
+          updateObject[field] = updateData[field];
         }
-      });
+      }
 
-      // Проверка уникальности username если обновляется
-      if (updateData.username && updateData.username !== user.username) {
-        const usernameExists = await User.findOne({
-          username: updateData.username,
+      // Проверяем уникальность username если он обновляется
+      if (updateObject.username) {
+        const existingUser = await User.findOne({
+          username: updateObject.username,
           _id: { $ne: userId },
         });
 
-        if (usernameExists) {
-          throw new Error("Username already taken");
+        if (existingUser) {
+          throw new Error("USERNAME_EXISTS");
         }
       }
 
-      if (Object.keys(filteredData).length === 0) {
-        throw new Error("No valid fields to update");
-      }
-
-      const updatedUser = await User.findByIdAndUpdate(userId, filteredData, {
+      const updatedUser = await User.findByIdAndUpdate(userId, updateObject, {
         new: true,
         runValidators: true,
       });
@@ -587,60 +563,20 @@ class AuthService {
       logUserAction(
         userId,
         "PROFILE_UPDATED",
-        `Updated fields: ${Object.keys(filteredData).join(", ")}`
+        `Profile updated: ${Object.keys(updateObject).join(", ")}`
       );
 
-      return updatedUser;
+      return await this.getUserInfo(userId);
     } catch (error) {
-      logError(error, "AuthService.updateUserProfile", userId);
+      logError(error, "AuthService.updateUserProfile");
 
-      if (error.message === "Username already taken") {
-        throw new Error("Имя пользователя уже занято");
+      if (error.message === "USER_NOT_FOUND") {
+        throw new Error("Пользователь не найден");
+      }
+      if (error.message === "USERNAME_EXISTS") {
+        throw new Error("Username уже занят");
       }
 
-      throw error;
-    }
-  }
-
-  // Проверка прав доступа пользователя
-  async checkUserPermissions(userId, requiredRole = null) {
-    try {
-      const user = await User.findById(userId);
-
-      if (!user) {
-        return { hasAccess: false, reason: "USER_NOT_FOUND" };
-      }
-
-      if (!user.isActive) {
-        return { hasAccess: false, reason: "ACCOUNT_INACTIVE" };
-      }
-
-      if (user.isBannedCurrently()) {
-        return { hasAccess: false, reason: "ACCOUNT_BANNED" };
-      }
-
-      if (requiredRole && user.role !== requiredRole) {
-        const roleHierarchy = { user: 1, expert: 2, admin: 3 };
-        const userLevel = roleHierarchy[user.role] || 0;
-        const requiredLevel = roleHierarchy[requiredRole] || 0;
-
-        if (userLevel < requiredLevel) {
-          return { hasAccess: false, reason: "INSUFFICIENT_ROLE" };
-        }
-      }
-
-      return {
-        hasAccess: true,
-        user: user,
-        permissions: {
-          canAnswer: user.canAnswer,
-          canModerate: user.canModerate,
-          isExpert: user.isExpert,
-          isAdmin: user.isAdmin,
-        },
-      };
-    } catch (error) {
-      logError(error, "AuthService.checkUserPermissions", userId);
       throw error;
     }
   }

@@ -2,7 +2,6 @@
 import express from "express";
 import authController from "../controllers/authController.js";
 import authService from "../services/authService.js";
-import userService from "../services/userService.js";
 import verificationService from "../services/verificationService.js";
 import User from "../models/User.js";
 import { authenticate, requireAdmin } from "../middlewares/auth.js";
@@ -84,7 +83,7 @@ router.post("/logout", authenticate, authController.logout);
 
 // ==================== УТИЛИТЫ ====================
 
-// Проверка доступности email
+// Проверка доступности email - ЗАВЕРШАЕМ (был обрезан)
 router.post(
   "/check-email",
   apiLimiter,
@@ -111,15 +110,22 @@ router.post(
       );
     }
 
-    const isAvailable = await userService.isEmailAvailable(email);
+    try {
+      const result = await authService.checkEmailAvailability(email);
 
-    res.json(
-      formatResponse(
-        true,
-        { available: isAvailable },
-        isAvailable ? "Email доступен" : "Email уже используется"
-      )
-    );
+      res.json(
+        formatResponse(
+          true,
+          {
+            email,
+            available: result.available,
+          },
+          result.message
+        )
+      );
+    } catch (error) {
+      throw error;
+    }
   })
 );
 
@@ -154,15 +160,22 @@ router.post(
       );
     }
 
-    const isAvailable = await userService.isUsernameAvailable(username);
+    try {
+      const result = await authService.checkUsernameAvailability(username);
 
-    res.json(
-      formatResponse(
-        true,
-        { available: isAvailable },
-        isAvailable ? "Username доступен" : "Username уже занят"
-      )
-    );
+      res.json(
+        formatResponse(
+          true,
+          {
+            username,
+            available: result.available,
+          },
+          result.message
+        )
+      );
+    } catch (error) {
+      throw error;
+    }
   })
 );
 
@@ -192,9 +205,13 @@ router.post(
       );
     }
 
-    const codeInfo = await verificationService.getActiveCodeInfo(email, type);
+    try {
+      const codeInfo = await verificationService.getActiveCodeInfo(email, type);
 
-    res.json(formatResponse(true, codeInfo, "Информация о коде получена"));
+      res.json(formatResponse(true, codeInfo, "Информация о коде получена"));
+    } catch (error) {
+      throw error;
+    }
   })
 );
 
@@ -227,12 +244,16 @@ router.post(
       );
     }
 
-    const history = await verificationService.getCodeHistory(
-      email,
-      limit || 10
-    );
+    try {
+      const history = await verificationService.getCodeHistory(
+        email,
+        limit || 10
+      );
 
-    res.json(formatResponse(true, history, "История кодов получена"));
+      res.json(formatResponse(true, history, "История кодов получена"));
+    } catch (error) {
+      throw error;
+    }
   })
 );
 
@@ -243,9 +264,13 @@ router.post(
   checkUserBan,
   requireAdmin,
   asyncHandler(async (req, res) => {
-    const result = await verificationService.cleanupExpiredCodes();
+    try {
+      const result = await verificationService.cleanupExpiredCodes();
 
-    res.json(formatResponse(true, result, "Очистка кодов выполнена"));
+      res.json(formatResponse(true, result, "Очистка кодов выполнена"));
+    } catch (error) {
+      throw error;
+    }
   })
 );
 
@@ -256,70 +281,20 @@ router.get(
   checkUserBan,
   requireAdmin,
   asyncHandler(async (req, res) => {
-    const stats = await verificationService.getVerificationStatistics();
+    try {
+      const stats = await verificationService.getVerificationStatistics();
 
-    res.json(formatResponse(true, stats, "Статистика кодов получена"));
+      res.json(formatResponse(true, stats, "Статистика кодов получена"));
+    } catch (error) {
+      throw error;
+    }
   })
 );
 
-// Принудительная верификация email
-router.post(
-  "/admin/force-verify",
-  authenticate,
-  checkUserBan,
-  requireAdmin,
-  asyncHandler(async (req, res) => {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json(
-        formatResponse(false, null, "Email обязателен", {
-          type: "VALIDATION_ERROR",
-          field: "email",
-        })
-      );
-    }
-
-    const user = await User.findOne({ email, provider: "local" });
-    if (!user) {
-      return res.status(404).json(
-        formatResponse(false, null, "Пользователь не найден", {
-          type: "USER_NOT_FOUND",
-        })
-      );
-    }
-
-    if (user.isEmailVerified) {
-      return res.json(
-        formatResponse(
-          true,
-          { alreadyVerified: true },
-          "Email уже верифицирован"
-        )
-      );
-    }
-
-    user.isEmailVerified = true;
-    user.isVerified = true;
-    await user.save();
-
-    res.json(
-      formatResponse(
-        true,
-        {
-          verified: true,
-          email: user.email,
-        },
-        `Email ${email} принудительно верифицирован`
-      )
-    );
-  })
-);
-
-// ==================== DEVELOPMENT РОУТЫ ====================
-
+// ==================== РАЗРАБОТЧЕСКИЕ РОУТЫ ====================
+// Только в режиме development
 if (process.env.NODE_ENV === "development") {
-  // Генерация тестового токена
+  // Генерация тестового токена для разработки
   router.post(
     "/dev/generate-token",
     asyncHandler(async (req, res) => {
@@ -331,29 +306,33 @@ if (process.env.NODE_ENV === "development") {
           .json(formatResponse(false, null, "Email обязателен"));
       }
 
-      const user = await User.findOne({ email });
-      if (!user) {
-        return res
-          .status(404)
-          .json(formatResponse(false, null, "Пользователь не найден"));
-      }
+      try {
+        const user = await User.findOne({ email });
+        if (!user) {
+          return res
+            .status(404)
+            .json(formatResponse(false, null, "Пользователь не найден"));
+        }
 
-      const token = authService.generateInternalToken(user);
+        const token = authService.generateInternalToken(user);
 
-      res.json(
-        formatResponse(
-          true,
-          {
-            token,
-            user: {
-              id: user._id,
-              email: user.email,
-              role: user.role,
+        res.json(
+          formatResponse(
+            true,
+            {
+              token,
+              user: {
+                id: user._id,
+                email: user.email,
+                role: user.role,
+              },
             },
-          },
-          "Тестовый токен сгенерирован"
-        )
-      );
+            "Тестовый токен сгенерирован"
+          )
+        );
+      } catch (error) {
+        throw error;
+      }
     })
   );
 
@@ -369,9 +348,13 @@ if (process.env.NODE_ENV === "development") {
           .json(formatResponse(false, null, "Email и тип кода обязательны"));
       }
 
-      const result = await verificationService.cancelActiveCode(email, type);
+      try {
+        const result = await verificationService.cancelActiveCode(email, type);
 
-      res.json(formatResponse(true, result, result.message));
+        res.json(formatResponse(true, result, result.message));
+      } catch (error) {
+        throw error;
+      }
     })
   );
 
@@ -379,14 +362,129 @@ if (process.env.NODE_ENV === "development") {
   router.get(
     "/dev/users",
     asyncHandler(async (req, res) => {
-      const users = await User.find({})
-        .select("email username role provider isEmailVerified createdAt")
-        .sort({ createdAt: -1 })
-        .limit(50);
+      try {
+        const users = await User.find({})
+          .select("email username role provider isEmailVerified createdAt")
+          .sort({ createdAt: -1 })
+          .limit(50);
 
-      res.json(
-        formatResponse(true, users, `Найдено ${users.length} пользователей`)
-      );
+        res.json(
+          formatResponse(true, users, `Найдено ${users.length} пользователей`)
+        );
+      } catch (error) {
+        throw error;
+      }
+    })
+  );
+
+  // Принудительная верификация email (только для разработки)
+  router.post(
+    "/dev/force-verify-email",
+    asyncHandler(async (req, res) => {
+      const { email } = req.body;
+
+      if (!email) {
+        return res
+          .status(400)
+          .json(formatResponse(false, null, "Email обязателен"));
+      }
+
+      try {
+        const user = await User.findOne({ email, provider: "local" });
+        if (!user) {
+          return res
+            .status(404)
+            .json(formatResponse(false, null, "Пользователь не найден"));
+        }
+
+        user.isEmailVerified = true;
+        user.isVerified = true;
+        await user.save();
+
+        res.json(
+          formatResponse(
+            true,
+            { userId: user._id, email: user.email },
+            "Email принудительно верифицирован"
+          )
+        );
+      } catch (error) {
+        throw error;
+      }
+    })
+  );
+
+  // Сброс попыток входа (для тестирования)
+  router.post(
+    "/dev/reset-login-attempts",
+    asyncHandler(async (req, res) => {
+      const { email } = req.body;
+
+      if (!email) {
+        return res
+          .status(400)
+          .json(formatResponse(false, null, "Email обязателен"));
+      }
+
+      try {
+        const user = await User.findOne({ email });
+        if (!user) {
+          return res
+            .status(404)
+            .json(formatResponse(false, null, "Пользователь не найден"));
+        }
+
+        await user.resetLoginAttempts();
+
+        res.json(
+          formatResponse(
+            true,
+            { userId: user._id, email: user.email },
+            "Попытки входа сброшены"
+          )
+        );
+      } catch (error) {
+        throw error;
+      }
+    })
+  );
+
+  // Получение информации о коде для разработки
+  router.post(
+    "/dev/get-code",
+    asyncHandler(async (req, res) => {
+      const { email, type } = req.body;
+
+      if (!email || !type) {
+        return res
+          .status(400)
+          .json(formatResponse(false, null, "Email и тип кода обязательны"));
+      }
+
+      try {
+        const code = await VerificationCode.findActiveCode(email, type);
+
+        if (!code) {
+          return res
+            .status(404)
+            .json(formatResponse(false, null, "Активный код не найден"));
+        }
+
+        res.json(
+          formatResponse(
+            true,
+            {
+              code: code.code,
+              expiresAt: code.expiresAt,
+              attempts: code.attempts,
+              type: code.type,
+            },
+            "Информация о коде получена"
+          )
+        );
+      } catch (error) {
+        throw error;
+      }
     })
   );
 }

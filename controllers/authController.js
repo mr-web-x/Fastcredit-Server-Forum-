@@ -4,14 +4,14 @@ import userService from "../services/userService.js";
 import verificationService from "../services/verificationService.js";
 import emailService from "../services/emailService.js";
 import { formatResponse, getClientIP } from "../utils/helpers.js";
-import { ERROR_MESSAGES, SUCCESS_MESSAGES } from "../utils/constants.js";
+import { ERROR_MESSAGES } from "../utils/constants.js";
 import { asyncHandler } from "../middlewares/errorHandler.js";
 import { logUserAction, logSecurityEvent } from "../middlewares/logger.js";
 
 class AuthController {
   // ==================== GOOGLE OAUTH МЕТОДЫ ====================
 
-  // Верификация токена из внешнего микросервиса (Google + fallback JWT)
+  // Верификация токена из внешнего микросервиса (Google + fallback JWT) - ЗАВЕРШАЕМ
   verifyToken = asyncHandler(async (req, res) => {
     const token = req.headers.authorization?.replace("Bearer ", "");
 
@@ -94,7 +94,7 @@ class AuthController {
 
   // ==================== ЛОКАЛЬНАЯ АВТОРИЗАЦИЯ ====================
 
-  // Регистрация пользователя
+  // Регистрация пользователя - ЗАВЕРШАЕМ
   register = asyncHandler(async (req, res) => {
     const { email, password, confirmPassword, firstName, lastName, username } =
       req.body;
@@ -176,6 +176,27 @@ class AuthController {
         requestIP
       );
 
+      // // Отправляем email с кодом если код создался
+      // if (result.verificationSent && result.devCode) {
+      //   try {
+      //     await emailService.sendEmail(
+      //       email,
+      //       "forumVerification",
+      //       "Fastcredit.sk",
+      //       { code: result.devCode }
+      //     );
+
+      //     logUserAction(
+      //       result.user._id,
+      //       "VERIFICATION_EMAIL_SENT",
+      //       `Verification email sent to ${email}`
+      //     );
+      //   } catch (emailError) {
+      //     console.error("Failed to send verification email:", emailError);
+      //     // Не блокируем регистрацию если email не отправился
+      //   }
+      // }
+
       res.status(201).json(
         formatResponse(
           true,
@@ -184,7 +205,7 @@ class AuthController {
             email: result.user.email,
             requiresVerification: true,
             verificationSent: result.verificationSent,
-            ...(result.devCode && { devCode: result.devCode }),
+            // ...(result.devCode && { devCode: result.devCode }),
           },
           result.message
         )
@@ -205,7 +226,7 @@ class AuthController {
     }
   });
 
-  // Вход пользователя
+  // Вход пользователя - ЗАВЕРШАЕМ
   login = asyncHandler(async (req, res) => {
     const { login, password } = req.body;
 
@@ -221,6 +242,17 @@ class AuthController {
 
     try {
       const result = await authService.loginUser({ login, password });
+
+      // Проверяем подтверждение email для локальных пользователей
+      if (result.user.provider === "local" && !result.user.isEmailVerified) {
+        return res.status(403).json(
+          formatResponse(false, null, "Необходимо подтвердить email", {
+            type: "EMAIL_NOT_VERIFIED",
+            userId: result.user._id,
+            email: result.user.email,
+          })
+        );
+      }
 
       // Получаем полную информацию о пользователе
       const userInfo = await authService.getUserInfo(result.user._id);
@@ -272,7 +304,7 @@ class AuthController {
     }
   });
 
-  // Отправка кода подтверждения email
+  // Отправка кода подтверждения email - ЗАВЕРШАЕМ
   sendVerificationCode = asyncHandler(async (req, res) => {
     const { email } = req.body;
     const requestIP = getClientIP(req);
@@ -358,7 +390,7 @@ class AuthController {
     }
   });
 
-  // Подтверждение email
+  // Подтверждение email - ЗАВЕРШАЕМ
   verifyEmail = asyncHandler(async (req, res) => {
     const { email, code } = req.body;
     const requestIP = getClientIP(req);
@@ -383,7 +415,11 @@ class AuthController {
     }
 
     try {
-      const result = await authService.verifyEmail(email, code, requestIP);
+      const result = await verificationService.verifyEmailCode(
+        email,
+        code,
+        requestIP
+      );
 
       if (!result.success) {
         return res.status(400).json(
@@ -393,18 +429,37 @@ class AuthController {
         );
       }
 
+      // Если email уже был подтвержден
+      if (result.alreadyVerified) {
+        return res.json(
+          formatResponse(true, { alreadyVerified: true }, result.message)
+        );
+      }
+
+      // Генерируем токен для подтвержденного пользователя
+      const user = result.user;
+      const token = authService.generateInternalToken({ _id: user.id });
+      const userInfo = await authService.getUserInfo(user.id);
+
+      logUserAction(
+        user.id,
+        "EMAIL_VERIFIED_SUCCESS",
+        `Email verified and user logged in: ${email}`
+      );
+
       res.json(
         formatResponse(
           true,
           {
-            verified: true,
-            ...(result.user && { user: result.user }),
+            ...userInfo,
+            token,
+            emailVerified: true,
           },
-          result.message
+          "Email успешно подтвержден. Добро пожаловать!"
         )
       );
     } catch (error) {
-      if (error.message === "Пользователь не найден") {
+      if (error.message.includes("не найден")) {
         return res.status(404).json(
           formatResponse(false, null, error.message, {
             type: "USER_NOT_FOUND",
@@ -416,7 +471,9 @@ class AuthController {
     }
   });
 
-  // Запрос сброса пароля
+  // ==================== ВОССТАНОВЛЕНИЕ ПАРОЛЯ ====================
+
+  // Запрос кода сброса пароля - ДОБАВЛЯЕМ
   requestPasswordReset = asyncHandler(async (req, res) => {
     const { email } = req.body;
     const requestIP = getClientIP(req);
@@ -442,47 +499,48 @@ class AuthController {
     }
 
     try {
-      // Генерируем код
-      const codeResult = await authService.requestPasswordReset(
-        email,
-        requestIP
-      );
+      const result = await authService.requestPasswordReset(email, requestIP);
 
-      if (!codeResult.success) {
+      if (!result.success) {
         return res.status(400).json(
-          formatResponse(false, null, codeResult.message, {
-            type: codeResult.error,
-            ...(codeResult.timeUntilExpiry && {
-              timeUntilExpiry: codeResult.timeUntilExpiry,
+          formatResponse(false, null, result.message, {
+            type: result.error,
+            ...(result.timeUntilExpiry && {
+              timeUntilExpiry: result.timeUntilExpiry,
             }),
           })
         );
       }
 
-      // Отправляем email с кодом сброса
-      try {
-        await emailService.sendEmail(email, "passwordReset", "Fastcredit.sk", {
-          code: codeResult.devCode || "XXXXXX",
-        });
+      // Отправляем email с кодом сброса пароля
+      if (result.devCode) {
+        try {
+          await emailService.sendEmail(
+            email,
+            "passwordReset",
+            "Fastcredit.sk",
+            { code: result.devCode }
+          );
 
-        logUserAction(
-          null,
-          "PASSWORD_RESET_EMAIL_SENT",
-          `Password reset email sent to ${email}`
-        );
-      } catch (emailError) {
-        console.error("Failed to send password reset email:", emailError);
+          logUserAction(
+            null,
+            "PASSWORD_RESET_EMAIL_SENT",
+            `Password reset email sent to ${email}`
+          );
+        } catch (emailError) {
+          console.error("Failed to send password reset email:", emailError);
+        }
       }
 
       res.json(
         formatResponse(
           true,
           {
-            requested: true,
-            expiresAt: codeResult.expiresAt,
-            ...(codeResult.devCode && { devCode: codeResult.devCode }),
+            sent: true,
+            expiresAt: result.expiresAt,
+            ...(result.devCode && { devCode: result.devCode }),
           },
-          codeResult.message
+          result.message
         )
       );
     } catch (error) {
@@ -490,7 +548,7 @@ class AuthController {
     }
   });
 
-  // Проверка кода сброса пароля (опциональный шаг)
+  // Проверка кода сброса пароля - ДОБАВЛЯЕМ
   verifyResetCode = asyncHandler(async (req, res) => {
     const { email, code } = req.body;
     const requestIP = getClientIP(req);
@@ -504,7 +562,7 @@ class AuthController {
       );
     }
 
-    // Валидация кода (должен быть 6 цифр)
+    // Валидация кода
     if (!/^[0-9]{6}$/.test(code)) {
       return res.status(400).json(
         formatResponse(false, null, "Код должен состоять из 6 цифр", {
@@ -534,13 +592,13 @@ class AuthController {
           true,
           {
             verified: true,
-            canResetPassword: true,
+            resetToken: result.resetToken,
           },
           result.message
         )
       );
     } catch (error) {
-      if (error.message === "Пользователь не найден") {
+      if (error.message.includes("не найден")) {
         return res.status(404).json(
           formatResponse(false, null, error.message, {
             type: "USER_NOT_FOUND",
@@ -552,7 +610,7 @@ class AuthController {
     }
   });
 
-  // Сброс пароля
+  // Сброс пароля по коду - ДОБАВЛЯЕМ
   resetPassword = asyncHandler(async (req, res) => {
     const { email, code, newPassword, confirmPassword } = req.body;
     const requestIP = getClientIP(req);
@@ -591,16 +649,6 @@ class AuthController {
       );
     }
 
-    // Валидация кода
-    if (!/^[0-9]{6}$/.test(code)) {
-      return res.status(400).json(
-        formatResponse(false, null, "Код должен состоять из 6 цифр", {
-          type: "VALIDATION_ERROR",
-          field: "code",
-        })
-      );
-    }
-
     try {
       const result = await authService.resetPassword(
         email,
@@ -617,15 +665,9 @@ class AuthController {
         );
       }
 
-      logUserAction(
-        result.user?.id,
-        "PASSWORD_RESET_SUCCESS",
-        `Password reset completed for: ${email}`
-      );
-
-      res.json(formatResponse(true, { reset: true }, result.message));
+      res.json(formatResponse(true, null, result.message));
     } catch (error) {
-      if (error.message.includes("найден")) {
+      if (error.message.includes("не найден")) {
         return res.status(404).json(
           formatResponse(false, null, error.message, {
             type: "USER_NOT_FOUND",
@@ -637,76 +679,52 @@ class AuthController {
     }
   });
 
-  // ==================== ОБЩИЕ МЕТОДЫ ====================
+  // ==================== ЗАЩИЩЕННЫЕ РОУТЫ ====================
 
-  // Получение информации о текущем пользователе
+  // Получение текущего пользователя - ДОБАВЛЯЕМ
   getCurrentUser = asyncHandler(async (req, res) => {
-    const userInfo = await authService.getUserInfo(req.user._id);
+    try {
+      const userInfo = await authService.getUserInfo(req.user._id);
 
-    res.json(
-      formatResponse(true, userInfo, "Информация о пользователе получена")
-    );
+      res.json(
+        formatResponse(true, userInfo, "Информация о пользователе получена")
+      );
+    } catch (error) {
+      if (error.message === "USER_NOT_FOUND") {
+        return res.status(404).json(
+          formatResponse(false, null, "Пользователь не найден", {
+            type: "USER_NOT_FOUND",
+          })
+        );
+      }
+
+      throw error;
+    }
   });
 
-  // Обновление профиля пользователя
+  // Обновление профиля - ДОБАВЛЯЕМ
   updateProfile = asyncHandler(async (req, res) => {
-    const { bio, avatar, firstName, lastName, username } = req.body;
-
-    // Валидация
-    if (bio && bio.length > 500) {
-      return res.status(400).json(
-        formatResponse(
-          false,
-          null,
-          "Биография не может превышать 500 символов",
-          {
-            type: "VALIDATION_ERROR",
-            field: "bio",
-          }
-        )
-      );
-    }
-
-    if (avatar && !avatar.match(/^https?:\/\/.+/)) {
-      return res.status(400).json(
-        formatResponse(false, null, "Неверный формат URL аватара", {
-          type: "VALIDATION_ERROR",
-          field: "avatar",
-        })
-      );
-    }
-
-    if (
-      username &&
-      (username.length < 3 || !/^[a-zA-Z0-9_]+$/.test(username))
-    ) {
-      return res.status(400).json(
-        formatResponse(
-          false,
-          null,
-          "Username должен содержать минимум 3 символа (буквы, цифры, _)",
-          {
-            type: "VALIDATION_ERROR",
-            field: "username",
-          }
-        )
-      );
-    }
+    const { firstName, lastName, username, bio } = req.body;
 
     try {
       const updatedUser = await authService.updateUserProfile(req.user._id, {
-        bio,
-        avatar,
         firstName,
         lastName,
         username,
+        bio,
       });
 
-      res.json(
-        formatResponse(true, updatedUser, SUCCESS_MESSAGES.PROFILE_UPDATED)
-      );
+      res.json(formatResponse(true, updatedUser, "Профиль успешно обновлен"));
     } catch (error) {
-      if (error.message.includes("занято")) {
+      if (error.message.includes("не найден")) {
+        return res.status(404).json(
+          formatResponse(false, null, error.message, {
+            type: "USER_NOT_FOUND",
+          })
+        );
+      }
+
+      if (error.message.includes("уже занят")) {
         return res.status(409).json(
           formatResponse(false, null, error.message, {
             type: "USERNAME_TAKEN",
@@ -718,83 +736,74 @@ class AuthController {
     }
   });
 
-  // Проверка прав доступа пользователя
+  // Проверка прав доступа - ДОБАВЛЯЕМ
   checkPermissions = asyncHandler(async (req, res) => {
-    const { requiredRole } = req.query;
-
-    const permissionCheck = await authService.checkUserPermissions(
-      req.user._id,
-      requiredRole
-    );
-
-    if (!permissionCheck.hasAccess) {
-      return res.status(403).json(
-        formatResponse(false, null, "Недостаточно прав доступа", {
-          type: "INSUFFICIENT_PERMISSIONS",
-          reason: permissionCheck.reason,
-          requiredRole,
-        })
-      );
-    }
+    const user = req.user;
 
     res.json(
       formatResponse(
         true,
         {
-          hasAccess: true,
-          userRole: permissionCheck.user.role,
-          permissions: permissionCheck.permissions,
-        },
-        "Проверка прав доступа пройдена"
-      )
-    );
-  });
-
-  // Логаут
-  logout = asyncHandler(async (req, res) => {
-    logUserAction(
-      req.user._id,
-      "USER_LOGGED_OUT",
-      "User logged out successfully"
-    );
-
-    res.json(formatResponse(true, null, "Вы успешно вышли из системы"));
-  });
-
-  // Получение статистики аутентификации (только для админов)
-  getAuthStatistics = asyncHandler(async (req, res) => {
-    const [userStats, verificationStats] = await Promise.all([
-      userService.getUserStatistics(),
-      verificationService.getVerificationStatistics(),
-    ]);
-
-    // Дополнительная статистика по активности
-    const activeUsersLast24h = await userService.getUsers({
-      limit: 1000,
-    });
-
-    const recentLogins = activeUsersLast24h.data.filter((user) => {
-      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      return user.lastLoginAt && new Date(user.lastLoginAt) > dayAgo;
-    }).length;
-
-    res.json(
-      formatResponse(
-        true,
-        {
-          users: userStats,
-          verificationCodes: verificationStats,
-          activity: {
-            recentLogins,
-            activeUsersLast24h: recentLogins,
+          role: user.role,
+          permissions: {
+            canCreateQuestions: user.canAccessFeatures(),
+            canAnswerQuestions: user.isExpert(),
+            canModerateContent: user.isAdmin(),
+            canAccessAdminPanel: user.isAdmin(),
+            canManageUsers: user.isAdmin(),
+          },
+          status: {
+            isActive: user.isActive,
+            isEmailVerified: user.isEmailVerified,
+            isBanned: user.isBannedCurrently(),
+            isLocked: user.isAccountLocked(),
           },
         },
-        "Статистика аутентификации получена"
+        "Права доступа получены"
       )
     );
   });
 
-  // Проверка здоровья auth сервиса
+  // Выход из системы - ДОБАВЛЯЕМ
+  logout = asyncHandler(async (req, res) => {
+    try {
+      logUserAction(
+        req.user._id,
+        "LOGOUT",
+        `User logged out: ${req.user.email}`
+      );
+
+      res.json(formatResponse(true, null, "Выход выполнен успешно"));
+    } catch (error) {
+      throw error;
+    }
+  });
+
+  // ==================== СТАТИСТИКА ====================
+
+  // Статистика аутентификации (для админов) - ДОБАВЛЯЕМ
+  getAuthStatistics = asyncHandler(async (req, res) => {
+    try {
+      const userStats = await userService.getUserStatistics();
+      const verificationStats =
+        await verificationService.getVerificationStatistics();
+
+      res.json(
+        formatResponse(
+          true,
+          {
+            users: userStats,
+            verificationCodes: verificationStats,
+          },
+          "Статистика аутентификации получена"
+        )
+      );
+    } catch (error) {
+      throw error;
+    }
+  });
+
+  // Проверка здоровья auth сервиса - ДОБАВЛЯЕМ
   healthCheck = asyncHandler(async (req, res) => {
     let emailServiceHealthy = true;
 

@@ -6,6 +6,7 @@ import {
   logError,
   logSecurityEvent,
 } from "../middlewares/logger.js";
+import emailService from "./emailService.js";
 
 class VerificationService {
   // Генерация и отправка кода подтверждения email
@@ -51,12 +52,16 @@ class VerificationService {
         requestIP
       );
 
-      // TODO: Здесь отправляем email
-      // await emailService.sendMessage(email, {
-      //   subject: 'Подтверждение email',
-      //   template: 'email_verification',
-      //   data: { code: verificationCode.code }
-      // });
+      try {
+        await emailService.sendEmail(
+          email,
+          "forumVerification",
+          "Fastcredit.sk",
+          { code: verificationCode.code }
+        );
+      } catch (error) {
+        console.log("EMAIL error", verificationCode.code);
+      }
 
       logUserAction(
         user._id,
@@ -84,7 +89,7 @@ class VerificationService {
     }
   }
 
-  // Подтверждение email по коду
+  // Подтверждение email по коду (ИСПРАВЛЕНО - БЫЛ ОБРЕЗАН!)
   async verifyEmailCode(email, code, requestIP = null) {
     try {
       // Ищем пользователя
@@ -158,7 +163,7 @@ class VerificationService {
     }
   }
 
-  // Генерация и отправка кода для сброса пароля
+  // Генерация и отправка кода для сброса пароля (ДОПИСАНО)
   async sendPasswordResetCode(email, requestIP = null) {
     try {
       // Проверяем существование пользователя

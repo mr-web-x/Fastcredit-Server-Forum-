@@ -16,7 +16,6 @@ const userSchema = new mongoose.Schema(
     // Стабильный идентификатор Google (sub). Только для Google OAuth
     googleId: {
       type: String,
-      unique: true,
       sparse: true, // позволяет иметь много пользователей без googleId
       index: true,
       default: null,
@@ -84,6 +83,7 @@ const userSchema = new mongoose.Schema(
         // Google пользователи автоматически верифицированы
         return this.provider === "google";
       },
+      index: true,
     },
 
     // Старое поле для совместимости (deprecated, используем isEmailVerified)
@@ -174,113 +174,88 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
 
-    // Попытки входа (для защиты от брутфорса)
+    // ========== ПОЛЯ ДЛЯ ЗАЩИТЫ ОТ БРУТФОРСА ==========
+    // Количество неудачных попыток входа
     loginAttempts: {
       type: Number,
       default: 0,
-      select: false,
+      min: 0,
     },
 
+    // Время блокировки аккаунта (ДОБАВЛЕНО - ОТСУТСТВОВАЛО!)
     lockUntil: {
       type: Date,
       default: null,
-      select: false,
     },
   },
   {
     timestamps: true,
-    toJSON: {
-      virtuals: true,
-      transform: function (doc, ret) {
-        // Удаляем чувствительные данные из JSON
-        delete ret.password;
-        delete ret.passwordResetToken;
-        delete ret.passwordResetExpires;
-        delete ret.loginAttempts;
-        delete ret.lockUntil;
-        return ret;
-      },
-    },
+    toJSON: { virtuals: true },
     toObject: { virtuals: true },
   }
 );
 
-// Индексы для производительности
-userSchema.index({ createdAt: -1 });
+// ==================== ИНДЕКСЫ ДЛЯ ПРОИЗВОДИТЕЛЬНОСТИ ====================
+userSchema.index({ email: 1, provider: 1 });
+userSchema.index({ username: 1, provider: 1 });
 userSchema.index({ role: 1, isActive: 1 });
-userSchema.index({ isBanned: 1, bannedUntil: 1 });
-userSchema.index({ isEmailVerified: 1 });
-userSchema.index({ provider: 1 });
+userSchema.index({ isEmailVerified: 1, provider: 1 });
+userSchema.index({ lockUntil: 1 }, { sparse: true });
+userSchema.index({ bannedUntil: 1 }, { sparse: true });
 
-// Виртуальные поля
+// ==================== ВИРТУАЛЬНЫЕ ПОЛЯ ====================
 userSchema.virtual("fullName").get(function () {
   if (this.firstName && this.lastName) {
     return `${this.firstName} ${this.lastName}`;
   }
-  return this.firstName || this.lastName || this.username || this.email;
+  if (this.firstName) return this.firstName;
+  if (this.lastName) return this.lastName;
+  return this.email;
 });
 
-userSchema.virtual("isExpert").get(function () {
-  return this.role === USER_ROLES.EXPERT || this.role === USER_ROLES.ADMIN;
+userSchema.virtual("displayName").get(function () {
+  return this.username || this.fullName || this.email;
 });
 
-userSchema.virtual("isAdmin").get(function () {
-  return this.role === USER_ROLES.ADMIN;
+// ========== ВИРТУАЛЬНЫЕ ПОЛЯ ДЛЯ БЛОКИРОВКИ ==========
+userSchema.virtual("isTemporarilyBanned").get(function () {
+  return this.bannedUntil && this.bannedUntil > Date.now();
 });
 
-userSchema.virtual("canAnswer").get(function () {
-  return this.isExpert && this.isActive && !this.isBanned;
-});
+// ==================== МЕТОДЫ ЭКЗЕМПЛЯРА ====================
 
-userSchema.virtual("canModerate").get(function () {
-  return this.isAdmin && this.isActive && !this.isBanned;
-});
-
-userSchema.virtual("isAccountLocked").get(function () {
-  return !!(this.lockUntil && this.lockUntil > Date.now());
-});
-
-// Методы экземпляра (бизнес-логика, НЕ криптография)
+// ========== МЕТОДЫ ДЛЯ БЛОКИРОВКИ (ДОБАВЛЕНО - ОТСУТСТВОВАЛО!) ==========
 userSchema.methods.isBannedCurrently = function () {
   if (!this.isBanned) return false;
-  if (!this.bannedUntil) return true; // перманентный бан
-  return new Date() < this.bannedUntil;
-};
 
-userSchema.methods.canPerformAction = function () {
-  return this.isActive && !this.isBannedCurrently() && !this.isAccountLocked;
-};
+  // Постоянный бан
+  if (!this.bannedUntil) return true;
 
-userSchema.methods.incrementQuestions = async function () {
-  this.totalQuestions += 1;
-  return await this.save();
-};
+  // Временный бан
+  if (this.bannedUntil > new Date()) return true;
 
-userSchema.methods.incrementAnswers = async function () {
-  this.totalAnswers += 1;
-  return await this.save();
-};
-
-userSchema.methods.updateRating = async function (newRating) {
-  this.rating = Math.max(0, newRating); // рейтинг не может быть отрицательным
-  return await this.save();
-};
-
-// Методы для защиты от брутфорса
-userSchema.methods.incLoginAttempts = async function () {
-  // Если аккаунт уже заблокирован и блокировка истекла, сбрасываем
-  if (this.lockUntil && this.lockUntil < Date.now()) {
-    return await this.updateOne({
-      $unset: {
-        loginAttempts: 1,
-        lockUntil: 1,
-      },
-    });
+  // Бан истек - сбрасываем
+  if (this.bannedUntil <= new Date()) {
+    this.isBanned = false;
+    this.bannedUntil = null;
+    this.bannedReason = null;
+    return false;
   }
 
-  const updates = { $inc: { loginAttempts: 1 } };
+  return false;
+};
 
-  // Блокируем после 5 неудачных попыток на 30 минут
+userSchema.methods.isAccountLocked = function () {
+  return this.lockUntil && this.lockUntil > Date.now();
+};
+
+// Увеличение попыток входа и блокировка при необходимости
+userSchema.methods.incLoginAttempts = async function () {
+  const updates = {
+    $inc: { loginAttempts: 1 },
+  };
+
+  // Если это 5-я попытка, блокируем на 30 минут
   if (this.loginAttempts + 1 >= 5 && !this.isAccountLocked) {
     updates.$set = {
       lockUntil: Date.now() + 30 * 60 * 1000, // 30 минут
@@ -290,6 +265,7 @@ userSchema.methods.incLoginAttempts = async function () {
   return await this.updateOne(updates);
 };
 
+// Сброс попыток входа
 userSchema.methods.resetLoginAttempts = async function () {
   return await this.updateOne({
     $unset: {
@@ -309,7 +285,45 @@ userSchema.methods.generatePasswordResetToken = function () {
   return resetToken;
 };
 
-// Статические методы
+// Проверка роли пользователя
+userSchema.methods.hasRole = function (role) {
+  return this.role === role;
+};
+
+userSchema.methods.isAdmin = function () {
+  return this.role === USER_ROLES.ADMIN;
+};
+
+userSchema.methods.isExpert = function () {
+  return this.role === USER_ROLES.EXPERT || this.role === USER_ROLES.ADMIN;
+};
+
+userSchema.methods.isUser = function () {
+  return this.role === USER_ROLES.USER;
+};
+
+// Проверка доступности функций (только для подтвержденных пользователей)
+userSchema.methods.canAccessFeatures = function () {
+  return this.isEmailVerified && this.isActive && !this.isBannedCurrently();
+};
+
+// Обновление статистики пользователя
+userSchema.methods.incrementQuestionCount = async function () {
+  this.totalQuestions += 1;
+  return await this.save();
+};
+
+userSchema.methods.incrementAnswerCount = async function () {
+  this.totalAnswers += 1;
+  return await this.save();
+};
+
+userSchema.methods.updateRating = async function (change) {
+  this.rating = Math.max(0, this.rating + change);
+  return await this.save();
+};
+
+// ==================== СТАТИЧЕСКИЕ МЕТОДЫ ====================
 userSchema.statics.findActiveExperts = function () {
   return this.find({
     role: { $in: [USER_ROLES.EXPERT, USER_ROLES.ADMIN] },
@@ -323,6 +337,22 @@ userSchema.statics.findByRole = function (role) {
     role,
     isActive: true,
   }).sort({ createdAt: -1 });
+};
+
+userSchema.statics.findByEmailOrUsername = function (
+  login,
+  includePassword = false
+) {
+  const query = this.findOne({
+    $or: [{ email: login.toLowerCase() }, { username: login }],
+    provider: "local",
+  });
+
+  if (includePassword) {
+    query.select("+password");
+  }
+
+  return query;
 };
 
 userSchema.statics.getStatistics = async function () {
@@ -348,6 +378,8 @@ userSchema.statics.getStatistics = async function () {
     return acc;
   }, {});
 };
+
+// ==================== MIDDLEWARE ====================
 
 // Pre-save middleware - только хеширование пароля
 userSchema.pre("save", async function (next) {

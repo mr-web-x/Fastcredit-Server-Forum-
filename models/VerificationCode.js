@@ -3,7 +3,6 @@ import mongoose from "mongoose";
 
 const verificationCodeSchema = new mongoose.Schema(
   {
-    // Email пользователя
     email: {
       type: String,
       required: true,
@@ -11,73 +10,63 @@ const verificationCodeSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
-
-    // 6-значный код
     code: {
       type: String,
       required: true,
       length: 6,
-      match: /^[0-9]{6}$/, // только цифры
+      match: /^[0-9]{6}$/,
     },
-
-    // Тип кода
     type: {
       type: String,
-      enum: ["email_verification", "password_reset"],
       required: true,
+      enum: ["email_verification", "password_reset"],
       index: true,
     },
-
-    // Время истечения
-    expiresAt: {
-      type: Date,
-      required: true,
-      index: { expireAfterSeconds: 0 }, // MongoDB автоматически удалит документ после истечения
-    },
-
-    // Использован ли код
     isUsed: {
       type: Boolean,
       default: false,
       index: true,
     },
-
-    // Время использования
     usedAt: {
       type: Date,
       default: null,
     },
-
-    // IP адрес запроса
+    attempts: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+    expiresAt: {
+      type: Date,
+      required: true,
+      index: true,
+    },
     requestIP: {
       type: String,
       default: null,
     },
-
-    // Количество попыток использования
-    attempts: {
-      type: Number,
-      default: 0,
-      max: 5, // максимум 5 попыток
+    isValid: {
+      type: Boolean,
+      default: true,
     },
   },
   {
-    timestamps: true,
+    timestamps: true, // Добавляет createdAt и updatedAt
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
-// Составные индексы
-verificationCodeSchema.index({ email: 1, type: 1 });
-verificationCodeSchema.index({ code: 1, isUsed: 1 });
-verificationCodeSchema.index({ createdAt: -1 });
+// ==================== ИНДЕКСЫ ДЛЯ ПРОИЗВОДИТЕЛЬНОСТИ ====================
+verificationCodeSchema.index({ email: 1, type: 1, isUsed: 1 });
+verificationCodeSchema.index({ email: 1, type: 1, expiresAt: 1 });
+verificationCodeSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // Автоочистка MongoDB
+verificationCodeSchema.index({ code: 1, type: 1, isUsed: 1 });
 
-// Виртуальные поля
+// ==================== ВИРТУАЛЬНЫЕ ПОЛЯ ====================
 verificationCodeSchema.virtual("isExpired").get(function () {
   return new Date() > this.expiresAt;
-});
-
-verificationCodeSchema.virtual("isValid").get(function () {
-  return !this.isUsed && !this.isExpired && this.attempts < 5;
 });
 
 verificationCodeSchema.virtual("timeUntilExpiry").get(function () {
@@ -85,7 +74,11 @@ verificationCodeSchema.virtual("timeUntilExpiry").get(function () {
   return Math.max(0, this.expiresAt.getTime() - Date.now());
 });
 
-// Методы экземпляра
+verificationCodeSchema.virtual("remainingAttempts").get(function () {
+  return Math.max(0, 5 - this.attempts);
+});
+
+// ==================== МЕТОДЫ ЭКЗЕМПЛЯРА ====================
 verificationCodeSchema.methods.markAsUsed = async function () {
   this.isUsed = true;
   this.usedAt = new Date();
@@ -98,15 +91,29 @@ verificationCodeSchema.methods.incrementAttempts = async function () {
 };
 
 verificationCodeSchema.methods.isValidForUse = function () {
-  return this.isValid && this.code && this.email;
+  return (
+    this.isValid &&
+    this.code &&
+    this.email &&
+    !this.isUsed &&
+    !this.isExpired &&
+    this.attempts < 5
+  );
 };
 
-// Статические методы
+verificationCodeSchema.methods.invalidate = async function () {
+  this.isValid = false;
+  return await this.save();
+};
+
+// ==================== СТАТИЧЕСКИЕ МЕТОДЫ ====================
+
+// Генерация 6-значного кода
 verificationCodeSchema.statics.generateCode = function () {
-  // Генерируем 6-значный код
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
+// Создание нового кода верификации
 verificationCodeSchema.statics.createVerificationCode = async function (
   email,
   type,
@@ -116,7 +123,7 @@ verificationCodeSchema.statics.createVerificationCode = async function (
   try {
     // Удаляем все старые неиспользованные коды для этого email и типа
     await this.deleteMany({
-      email,
+      email: email.toLowerCase(),
       type,
       isUsed: false,
     });
@@ -126,21 +133,23 @@ verificationCodeSchema.statics.createVerificationCode = async function (
     const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
 
     const verificationCode = await this.create({
-      email,
+      email: email.toLowerCase(),
       code,
       type,
       expiresAt,
       requestIP,
       isUsed: false,
       attempts: 0,
+      isValid: true,
     });
 
     return verificationCode;
   } catch (error) {
-    throw error;
+    throw new Error(`Ошибка создания кода: ${error.message}`);
   }
 };
 
+// Проверка кода
 verificationCodeSchema.statics.verifyCode = async function (email, code, type) {
   try {
     // Ищем код
@@ -198,10 +207,15 @@ verificationCodeSchema.statics.verifyCode = async function (email, code, type) {
       message: "Код успешно подтвержден",
     };
   } catch (error) {
-    throw error;
+    return {
+      success: false,
+      error: "VERIFICATION_ERROR",
+      message: `Ошибка проверки кода: ${error.message}`,
+    };
   }
 };
 
+// Поиск активного кода
 verificationCodeSchema.statics.findActiveCode = function (email, type) {
   return this.findOne({
     email: email.toLowerCase(),
@@ -209,16 +223,19 @@ verificationCodeSchema.statics.findActiveCode = function (email, type) {
     isUsed: false,
     expiresAt: { $gt: new Date() },
     attempts: { $lt: 5 },
+    isValid: true,
   });
 };
 
+// История кодов пользователя
 verificationCodeSchema.statics.getCodeHistory = function (email, limit = 10) {
   return this.find({ email: email.toLowerCase() })
     .sort({ createdAt: -1 })
     .limit(limit)
-    .select("type code isUsed usedAt attempts createdAt expiresAt");
+    .select("type code isUsed usedAt attempts createdAt expiresAt requestIP");
 };
 
+// Очистка истекших кодов
 verificationCodeSchema.statics.cleanupExpiredCodes = async function () {
   try {
     const result = await this.deleteMany({
@@ -226,77 +243,85 @@ verificationCodeSchema.statics.cleanupExpiredCodes = async function () {
     });
 
     return {
+      success: true,
       deletedCount: result.deletedCount,
       message: `Удалено ${result.deletedCount} истекших кодов`,
     };
   } catch (error) {
-    throw error;
+    return {
+      success: false,
+      error: error.message,
+      message: "Ошибка при очистке истекших кодов",
+    };
   }
 };
 
+// Статистика кодов
 verificationCodeSchema.statics.getStatistics = async function () {
   try {
-    const [totalCodes, usedCodes, expiredCodes, activeCodesTypes] =
-      await Promise.all([
-        this.countDocuments(),
-        this.countDocuments({ isUsed: true }),
-        this.countDocuments({ expiresAt: { $lt: new Date() } }),
-        this.aggregate([
-          {
-            $match: {
-              isUsed: false,
-              expiresAt: { $gt: new Date() },
+    const stats = await this.aggregate([
+      {
+        $group: {
+          _id: "$type",
+          total: { $sum: 1 },
+          used: { $sum: { $cond: ["$isUsed", 1, 0] } },
+          expired: {
+            $sum: {
+              $cond: [{ $lt: ["$expiresAt", new Date()] }, 1, 0],
             },
           },
-          {
-            $group: {
-              _id: "$type",
-              count: { $sum: 1 },
+          active: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$isUsed", false] },
+                    { $gt: ["$expiresAt", new Date()] },
+                    { $lt: ["$attempts", 5] },
+                  ],
+                },
+                1,
+                0,
+              ],
             },
           },
-        ]),
-      ]);
+          averageAttempts: { $avg: "$attempts" },
+        },
+      },
+    ]);
+
+    const totalStats = await this.countDocuments();
 
     return {
-      total: totalCodes,
-      used: usedCodes,
-      expired: expiredCodes,
-      active: totalCodes - usedCodes - expiredCodes,
-      byType: activeCodesTypes.reduce((acc, item) => {
-        acc[item._id] = item.count;
+      total: totalStats,
+      byType: stats.reduce((acc, stat) => {
+        acc[stat._id] = {
+          total: stat.total,
+          used: stat.used,
+          expired: stat.expired,
+          active: stat.active,
+          averageAttempts: Math.round(stat.averageAttempts * 100) / 100,
+        };
         return acc;
       }, {}),
     };
   } catch (error) {
-    throw error;
+    throw new Error(`Ошибка получения статистики: ${error.message}`);
   }
 };
 
 // Pre-save middleware
 verificationCodeSchema.pre("save", function (next) {
-  // Убеждаемся что email в нижнем регистре
+  // Приводим email к нижнему регистру
   if (this.isModified("email")) {
     this.email = this.email.toLowerCase();
   }
 
-  // Убеждаемся что code это строка из 6 цифр
-  if (this.isModified("code")) {
-    this.code = this.code.toString().padStart(6, "0");
-  }
-
   next();
-});
-
-// Post-save middleware для логирования
-verificationCodeSchema.post("save", function (doc) {
-  if (doc.isNew) {
-    console.log(`Verification code created: ${doc.type} for ${doc.email}`);
-  }
 });
 
 const VerificationCode = mongoose.model(
   "VerificationCode",
   verificationCodeSchema
 );
-
 export default VerificationCode;
