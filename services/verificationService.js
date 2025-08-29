@@ -52,6 +52,8 @@ class VerificationService {
         requestIP
       );
 
+      console.log("verificationCode", verificationCode);
+
       try {
         await emailService.sendEmail(
           email,

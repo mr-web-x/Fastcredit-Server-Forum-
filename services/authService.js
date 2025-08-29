@@ -290,6 +290,8 @@ class AuthService {
       try {
         verificationResult =
           await verificationService.sendEmailVerificationCode(email, requestIP);
+
+        console.log("verificationResult", verificationResult);
       } catch (verificationError) {
         logError(verificationError, "AuthService.registerUser - verification");
         // Не блокируем регистрацию, если код не отправился

@@ -25,7 +25,7 @@ class AnswerService {
 
       // Проверяем права эксперта
       const expert = await User.findById(expertId);
-      if (!expert || !expert.canAnswer) {
+      if (!expert.isExpert()) {
         throw new Error("Only experts can answer questions");
       }
 

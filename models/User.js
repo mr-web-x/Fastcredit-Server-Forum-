@@ -5,43 +5,40 @@ import { hashPassword, generateSecureToken } from "../utils/security.js";
 
 const userSchema = new mongoose.Schema(
   {
-    // OAuth провайдер (для различения способа регистрации)
+    // OAuth провайдер
     provider: {
       type: String,
       enum: ["local", "google"],
-      default: "local", // По умолчанию локальная регистрация
+      default: "local",
       index: true,
     },
 
-    // Стабильный идентификатор Google (sub). Только для Google OAuth
+    // Стабильный идентификатор Google (sub) — только для Google OAuth
+    // ВАЖНО: без default и без unique на поле
     googleId: {
       type: String,
-      sparse: true, // позволяет иметь много пользователей без googleId
       index: true,
-      default: null,
     },
 
     // Основные поля
     email: {
       type: String,
       required: true,
-      unique: true,
+      unique: true, // email уникален глобально для обоих провайдеров
       lowercase: true,
       trim: true,
       index: true,
     },
 
-    // Username для локальной авторизации (необязательный)
+    // Опциональный username для локальной авторизации
+    // ВАЖНО: без default и без unique на поле
     username: {
       type: String,
-      unique: true,
-      sparse: true, // позволяет null значения без нарушения уникальности
       trim: true,
       minlength: 3,
       maxlength: 30,
-      match: /^[a-zA-Z0-9_]+$/, // только буквы, цифры и подчеркивание
+      match: /^[a-zA-Z0-9_]+$/,
       index: true,
-      default: null,
     },
 
     // Пароль для локальной авторизации
@@ -51,23 +48,12 @@ const userSchema = new mongoose.Schema(
         return this.provider === "local";
       },
       minlength: 6,
-      select: false, // По умолчанию не включать в выборки
+      select: false,
     },
 
     // Имя и фамилия
-    firstName: {
-      type: String,
-      trim: true,
-      maxlength: 50,
-      default: null,
-    },
-
-    lastName: {
-      type: String,
-      trim: true,
-      maxlength: 50,
-      default: null,
-    },
+    firstName: { type: String, trim: true, maxlength: 50 },
+    lastName: { type: String, trim: true, maxlength: 50 },
 
     role: {
       type: String,
@@ -76,17 +62,16 @@ const userSchema = new mongoose.Schema(
       index: true,
     },
 
-    // Email verification для локальной регистрации
+    // Верификация email
     isEmailVerified: {
       type: Boolean,
       default: function () {
-        // Google пользователи автоматически верифицированы
-        return this.provider === "google";
+        return this.provider === "google"; // Google — сразу верифицирован
       },
       index: true,
     },
 
-    // Старое поле для совместимости (deprecated, используем isEmailVerified)
+    // deprecated: оставлено для совместимости
     isVerified: {
       type: Boolean,
       default: function () {
@@ -94,99 +79,31 @@ const userSchema = new mongoose.Schema(
       },
     },
 
-    avatar: {
-      type: String,
-      default: null,
-    },
+    avatar: { type: String },
+    bio: { type: String, maxlength: 500 },
 
-    bio: {
-      type: String,
-      maxlength: 500,
-      default: null,
-    },
+    rating: { type: Number, default: 0, min: 0 },
+    totalAnswers: { type: Number, default: 0, min: 0 },
+    totalQuestions: { type: Number, default: 0, min: 0 },
 
-    rating: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
+    isActive: { type: Boolean, default: true, index: true },
 
-    totalAnswers: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
+    isBanned: { type: Boolean, default: false, index: true },
+    bannedUntil: { type: Date },
+    bannedReason: { type: String },
 
-    totalQuestions: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
+    lastLoginAt: { type: Date },
 
-    isActive: {
-      type: Boolean,
-      default: true,
-      index: true,
-    },
+    roleChangedAt: { type: Date },
+    roleChangedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
-    isBanned: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
+    // Восстановление пароля
+    passwordResetToken: { type: String, select: false },
+    passwordResetExpires: { type: Date, select: false },
 
-    bannedUntil: {
-      type: Date,
-      default: null,
-    },
-
-    bannedReason: {
-      type: String,
-      default: null,
-    },
-
-    lastLoginAt: {
-      type: Date,
-      default: null,
-    },
-
-    roleChangedAt: {
-      type: Date,
-      default: null,
-    },
-
-    roleChangedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
-
-    // Поля для восстановления пароля
-    passwordResetToken: {
-      type: String,
-      default: null,
-      select: false,
-    },
-
-    passwordResetExpires: {
-      type: Date,
-      default: null,
-      select: false,
-    },
-
-    // ========== ПОЛЯ ДЛЯ ЗАЩИТЫ ОТ БРУТФОРСА ==========
-    // Количество неудачных попыток входа
-    loginAttempts: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    // Время блокировки аккаунта (ДОБАВЛЕНО - ОТСУТСТВОВАЛО!)
-    lockUntil: {
-      type: Date,
-      default: null,
-    },
+    // Брутфорс-защита
+    loginAttempts: { type: Number, default: 0, min: 0 },
+    lockUntil: { type: Date },
   },
   {
     timestamps: true,
@@ -195,19 +112,35 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// ==================== ИНДЕКСЫ ДЛЯ ПРОИЗВОДИТЕЛЬНОСТИ ====================
+// ==================== ИНДЕКСЫ ====================
+// Частичный уникальный индекс: уникален только когда значение существует и не null
+userSchema.index(
+  { googleId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { googleId: { $exists: true, $ne: null } },
+  }
+);
+
+userSchema.index(
+  { username: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { username: { $exists: true, $ne: null } },
+  }
+);
+
+// Производственные индексы
 userSchema.index({ email: 1, provider: 1 });
-userSchema.index({ username: 1, provider: 1 });
 userSchema.index({ role: 1, isActive: 1 });
 userSchema.index({ isEmailVerified: 1, provider: 1 });
 userSchema.index({ lockUntil: 1 }, { sparse: true });
 userSchema.index({ bannedUntil: 1 }, { sparse: true });
 
-// ==================== ВИРТУАЛЬНЫЕ ПОЛЯ ====================
+// ==================== ВИРТУАЛЫ ====================
 userSchema.virtual("fullName").get(function () {
-  if (this.firstName && this.lastName) {
+  if (this.firstName && this.lastName)
     return `${this.firstName} ${this.lastName}`;
-  }
   if (this.firstName) return this.firstName;
   if (this.lastName) return this.lastName;
   return this.email;
@@ -217,14 +150,12 @@ userSchema.virtual("displayName").get(function () {
   return this.username || this.fullName || this.email;
 });
 
-// ========== ВИРТУАЛЬНЫЕ ПОЛЯ ДЛЯ БЛОКИРОВКИ ==========
 userSchema.virtual("isTemporarilyBanned").get(function () {
-  return this.bannedUntil && this.bannedUntil > Date.now();
+  return this.bannedUntil && this.bannedUntil.getTime() > Date.now();
 });
 
 // ==================== МЕТОДЫ ЭКЗЕМПЛЯРА ====================
 
-// ========== МЕТОДЫ ДЛЯ БЛОКИРОВКИ (ДОБАВЛЕНО - ОТСУТСТВОВАЛО!) ==========
 userSchema.methods.isBannedCurrently = function () {
   if (!this.isBanned) return false;
 
@@ -232,98 +163,78 @@ userSchema.methods.isBannedCurrently = function () {
   if (!this.bannedUntil) return true;
 
   // Временный бан
-  if (this.bannedUntil > new Date()) return true;
+  if (this.bannedUntil.getTime() > Date.now()) return true;
 
-  // Бан истек - сбрасываем
-  if (this.bannedUntil <= new Date()) {
-    this.isBanned = false;
-    this.bannedUntil = null;
-    this.bannedReason = null;
-    return false;
-  }
-
+  // Бан истёк — подчистим локально (сохранение делать снаружи по необходимости)
+  this.isBanned = false;
+  this.bannedUntil = null;
+  this.bannedReason = null;
   return false;
 };
 
 userSchema.methods.isAccountLocked = function () {
-  return this.lockUntil && this.lockUntil > Date.now();
+  return !!(this.lockUntil && this.lockUntil.getTime() > Date.now());
 };
 
 // Увеличение попыток входа и блокировка при необходимости
 userSchema.methods.incLoginAttempts = async function () {
-  const updates = {
-    $inc: { loginAttempts: 1 },
-  };
+  const updates = { $inc: { loginAttempts: 1 } };
 
   // Если это 5-я попытка, блокируем на 30 минут
-  if (this.loginAttempts + 1 >= 5 && !this.isAccountLocked) {
-    updates.$set = {
-      lockUntil: Date.now() + 30 * 60 * 1000, // 30 минут
-    };
+  if (this.loginAttempts + 1 >= 5 && !this.isAccountLocked()) {
+    updates.$set = { lockUntil: new Date(Date.now() + 30 * 60 * 1000) };
   }
 
-  return await this.updateOne(updates);
+  return this.updateOne(updates);
 };
 
 // Сброс попыток входа
-userSchema.methods.resetLoginAttempts = async function () {
-  return await this.updateOne({
-    $unset: {
-      loginAttempts: 1,
-      lockUntil: 1,
-    },
-  });
+userSchema.methods.resetLoginAttempts = function () {
+  return this.updateOne({ $unset: { loginAttempts: 1, lockUntil: 1 } });
 };
 
-// Генерация токена сброса пароля с помощью security.js
+// Токен для сброса пароля
 userSchema.methods.generatePasswordResetToken = function () {
-  const resetToken = generateSecureToken(16); // 32 символа hex
-
+  const resetToken = generateSecureToken(16); // 32 hex
   this.passwordResetToken = resetToken;
-  this.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 минут
-
+  this.passwordResetExpires = new Date(Date.now() + 10 * 60 * 1000);
   return resetToken;
 };
 
-// Проверка роли пользователя
+// Роли
 userSchema.methods.hasRole = function (role) {
   return this.role === role;
 };
-
 userSchema.methods.isAdmin = function () {
   return this.role === USER_ROLES.ADMIN;
 };
-
 userSchema.methods.isExpert = function () {
   return this.role === USER_ROLES.EXPERT || this.role === USER_ROLES.ADMIN;
 };
-
 userSchema.methods.isUser = function () {
   return this.role === USER_ROLES.USER;
 };
 
-// Проверка доступности функций (только для подтвержденных пользователей)
+// Доступ к функциям
 userSchema.methods.canAccessFeatures = function () {
   return this.isEmailVerified && this.isActive && !this.isBannedCurrently();
 };
 
-// Обновление статистики пользователя
-userSchema.methods.incrementQuestionCount = async function () {
+// Статистика
+userSchema.methods.incrementQuestionCount = function () {
   this.totalQuestions += 1;
-  return await this.save();
+  return this.save();
 };
-
-userSchema.methods.incrementAnswerCount = async function () {
+userSchema.methods.incrementAnswerCount = function () {
   this.totalAnswers += 1;
-  return await this.save();
+  return this.save();
 };
-
-userSchema.methods.updateRating = async function (change) {
+userSchema.methods.updateRating = function (change) {
   this.rating = Math.max(0, this.rating + change);
-  return await this.save();
+  return this.save();
 };
 
-// ==================== СТАТИЧЕСКИЕ МЕТОДЫ ====================
+// ==================== СТАТИЧЕСКИЕ ====================
 userSchema.statics.findActiveExperts = function () {
   return this.find({
     role: { $in: [USER_ROLES.EXPERT, USER_ROLES.ADMIN] },
@@ -333,12 +244,10 @@ userSchema.statics.findActiveExperts = function () {
 };
 
 userSchema.statics.findByRole = function (role) {
-  return this.find({
-    role,
-    isActive: true,
-  }).sort({ createdAt: -1 });
+  return this.find({ role, isActive: true }).sort({ createdAt: -1 });
 };
 
+// Поиск для локальной авторизации
 userSchema.statics.findByEmailOrUsername = function (
   login,
   includePassword = false
@@ -347,11 +256,7 @@ userSchema.statics.findByEmailOrUsername = function (
     $or: [{ email: login.toLowerCase() }, { username: login }],
     provider: "local",
   });
-
-  if (includePassword) {
-    query.select("+password");
-  }
-
+  if (includePassword) query.select("+password");
   return query;
 };
 
@@ -381,25 +286,24 @@ userSchema.statics.getStatistics = async function () {
 
 // ==================== MIDDLEWARE ====================
 
-// Pre-save middleware - только хеширование пароля
 userSchema.pre("save", async function (next) {
-  // Хешируем пароль только если он изменился, используя security.js
+  // Хешируем пароль только если изменился
   if (this.isModified("password")) {
     this.password = await hashPassword(this.password);
   }
 
-  // Обновляем roleChangedAt при изменении роли
+  // Отслеживаем смену роли
   if (this.isModified("role")) {
     this.roleChangedAt = new Date();
   }
 
-  // Сбрасываем поля бана если пользователь разбанен
+  // Если разбанили — очищаем поля
   if (this.isModified("isBanned") && !this.isBanned) {
     this.bannedUntil = null;
     this.bannedReason = null;
   }
 
-  // Синхронизируем старое поле isVerified с новым isEmailVerified
+  // Синхронизация со старым полем
   if (this.isModified("isEmailVerified")) {
     this.isVerified = this.isEmailVerified;
   }
@@ -407,7 +311,6 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// Post-save middleware
 userSchema.post("save", function (doc) {
   if (doc.isModified("role")) {
     console.log(`User role changed: ${doc.email} -> ${doc.role}`);

@@ -81,7 +81,7 @@ export const checkUserCanPerformAction = (req, res, next) => {
       .json(formatResponse(false, null, ERROR_MESSAGES.UNAUTHORIZED));
   }
 
-  if (!req.user.canPerformAction()) {
+  if (!req.user.canAccessFeatures()) {
     const reason = !req.user.isActive
       ? "Аккаунт деактивирован"
       : "Аккаунт заблокирован";
