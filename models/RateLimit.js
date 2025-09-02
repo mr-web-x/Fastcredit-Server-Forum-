@@ -34,7 +34,6 @@ const rateLimitSchema = new mongoose.Schema(
     expiresAt: {
       type: Date,
       required: true,
-      index: true,
     },
   },
   {
@@ -45,7 +44,6 @@ const rateLimitSchema = new mongoose.Schema(
 // Составные индексы
 rateLimitSchema.index({ userId: 1, action: 1, windowStart: 1 });
 rateLimitSchema.index({ ip: 1, action: 1, windowStart: 1 });
-rateLimitSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 // Статические методы
 rateLimitSchema.statics.checkLimit = async function (

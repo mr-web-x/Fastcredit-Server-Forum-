@@ -6,36 +6,45 @@ import { formatResponse, getClientIP } from "../utils/helpers.js";
 import { RATE_LIMIT_ACTIONS, USER_ROLES } from "../utils/constants.js";
 import { logSecurityEvent } from "./logger.js";
 
+// === УТИЛИТЫ ===
+
+// Генератор handler'а для v7: логируем + отдаём ваш message
+const makeHandler = (eventType, buildLogText) => {
+  return (req, res, next, options) => {
+    // Лог
+    try {
+      const userId = req.user?._id ?? null;
+      const ip = getClientIP(req);
+      const text =
+        typeof buildLogText === "function"
+          ? buildLogText(req, options)
+          : buildLogText ||
+            `Rate limit exceeded: limit=${options.limit}, windowMs=${options.windowMs}`;
+      logSecurityEvent(eventType, text, userId, ip);
+    } catch (_) {
+      // лог падать не должен
+    }
+
+    // Тело ответа — берём из options.message (оно может быть функцией)
+    const body =
+      typeof options.message === "function"
+        ? options.message(req, res)
+        : options.message;
+
+    res.status(options.statusCode || 429).json(body);
+  };
+};
+
 // Кастомная функция для генерации ключа
 const keyGenerator = (req) => {
-  // Если пользователь авторизован, используем его ID, иначе IP
-  if (req.user && req.user._id) {
-    return `user_${req.user._id}`;
-  }
+  if (req.user && req.user._id) return `user_${req.user._id}`;
   return `ip_${getClientIP(req)}`;
 };
 
-// Кастомная функция для пропуска запросов
-const skip = (req) => {
-  // Админы могут иметь повышенные лимиты для модерации
-  if (req.user && req.user.role === USER_ROLES.ADMIN) {
-    return false; // не пропускаем, но у них будет выше лимит
-  }
-  return false;
-};
+// Можно оставить как есть (сейчас всегда false)
+const skip = (req) => false;
 
-// Функция обработки превышения лимита
-const onLimitReached = (req, res, options) => {
-  const userId = req.user?._id;
-  const ip = getClientIP(req);
-
-  logSecurityEvent(
-    "RATE_LIMIT_EXCEEDED",
-    `Rate limit exceeded: ${options.max} requests in ${options.windowMs}ms`,
-    userId,
-    ip
-  );
-};
+// === ЛИМИТЕРЫ ===
 
 // Базовый rate limiter для всех API запросов
 export const createApiLimiter = () => {
@@ -43,7 +52,6 @@ export const createApiLimiter = () => {
     windowMs: config.RATE_LIMIT.WINDOW_MS,
     limit: (req) => {
       if (!req.user) return config.RATE_LIMIT.USER.API_REQUESTS;
-
       switch (req.user.role) {
         case USER_ROLES.ADMIN:
           return config.RATE_LIMIT.ADMIN.API_REQUESTS;
@@ -67,7 +75,11 @@ export const createApiLimiter = () => {
           resetTime: new Date(Date.now() + config.RATE_LIMIT.WINDOW_MS),
         }
       ),
-    onLimitReached,
+    handler: makeHandler(
+      "RATE_LIMIT_EXCEEDED",
+      (req, options) =>
+        `API rate limit exceeded: limit=${options.limit}, windowMs=${options.windowMs}`
+    ),
   });
 };
 
@@ -76,8 +88,7 @@ export const createQuestionLimiter = () => {
   return rateLimit({
     windowMs: config.RATE_LIMIT.WINDOW_MS,
     limit: (req) => {
-      if (!req.user) return 2; // анонимы почти ничего не могут
-
+      if (!req.user) return 2;
       switch (req.user.role) {
         case USER_ROLES.EXPERT:
         case USER_ROLES.ADMIN:
@@ -107,7 +118,10 @@ export const createQuestionLimiter = () => {
         }
       );
     },
-    onLimitReached,
+    handler: makeHandler(
+      "RATE_LIMIT_EXCEEDED",
+      (req, options) => `Question rate limit exceeded`
+    ),
   });
 };
 
@@ -116,9 +130,7 @@ export const createAnswerLimiter = () => {
   return rateLimit({
     windowMs: config.RATE_LIMIT.WINDOW_MS,
     limit: (req) => {
-      if (!req.user || req.user.role === USER_ROLES.USER) {
-        return 0; // обычные пользователи не могут отвечать
-      }
+      if (!req.user || req.user.role === USER_ROLES.USER) return 0;
       return config.RATE_LIMIT.EXPERT.ANSWERS;
     },
     keyGenerator,
@@ -135,7 +147,10 @@ export const createAnswerLimiter = () => {
           resetTime: new Date(Date.now() + config.RATE_LIMIT.WINDOW_MS),
         }
       ),
-    onLimitReached,
+    handler: makeHandler(
+      "RATE_LIMIT_EXCEEDED",
+      (req, options) => `Answer rate limit exceeded`
+    ),
   });
 };
 
@@ -144,8 +159,7 @@ export const createCommentLimiter = () => {
   return rateLimit({
     windowMs: config.RATE_LIMIT.WINDOW_MS,
     limit: (req) => {
-      if (!req.user) return 5; // анонимы ограничены
-
+      if (!req.user) return 5;
       switch (req.user.role) {
         case USER_ROLES.EXPERT:
         case USER_ROLES.ADMIN:
@@ -175,7 +189,10 @@ export const createCommentLimiter = () => {
         }
       );
     },
-    onLimitReached,
+    handler: makeHandler(
+      "RATE_LIMIT_EXCEEDED",
+      (req, options) => `Comment rate limit exceeded`
+    ),
   });
 };
 
@@ -183,7 +200,7 @@ export const createCommentLimiter = () => {
 export const createLikeLimiter = () => {
   return rateLimit({
     windowMs: config.RATE_LIMIT.WINDOW_MS,
-    limit: config.RATE_LIMIT.USER.LIKES, // одинаково для всех ролей
+    limit: config.RATE_LIMIT.USER.LIKES,
     keyGenerator,
     standardHeaders: "draft-8",
     legacyHeaders: false,
@@ -197,16 +214,19 @@ export const createLikeLimiter = () => {
         resetTime: new Date(Date.now() + config.RATE_LIMIT.WINDOW_MS),
       }
     ),
-    onLimitReached,
+    handler: makeHandler(
+      "RATE_LIMIT_EXCEEDED",
+      (req, options) => `Like rate limit exceeded`
+    ),
   });
 };
 
 // Строгий rate limiter для аутентификации
 export const createAuthLimiter = () => {
   return rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 минут
-    limit: 5, // только 5 попыток входа за 15 минут
-    keyGenerator: (req) => getClientIP(req), // только по IP
+    windowMs: 15 * 60 * 1000,
+    limit: 5,
+    keyGenerator: (req) => getClientIP(req),
     standardHeaders: "draft-8",
     legacyHeaders: false,
     message: formatResponse(
@@ -218,14 +238,11 @@ export const createAuthLimiter = () => {
         resetTime: new Date(Date.now() + 15 * 60 * 1000),
       }
     ),
-    onLimitReached: (req, res, options) => {
-      logSecurityEvent(
-        "AUTH_RATE_LIMIT_EXCEEDED",
-        `Auth rate limit exceeded: ${options.limit} attempts in ${options.windowMs}ms`,
-        null,
-        getClientIP(req)
-      );
-    },
+    handler: makeHandler(
+      "AUTH_RATE_LIMIT_EXCEEDED",
+      (req, options) =>
+        `Auth rate limit exceeded: limit=${options.limit}, windowMs=${options.windowMs}`
+    ),
   });
 };
 
@@ -236,7 +253,6 @@ export const checkCustomRateLimit = (action) => {
       const identifier = req.user ? req.user._id : getClientIP(req);
       const isUserId = !!req.user;
 
-      // Определяем лимит в зависимости от роли и действия
       let limit;
       switch (action) {
         case RATE_LIMIT_ACTIONS.QUESTION_CREATE:
@@ -270,7 +286,6 @@ export const checkCustomRateLimit = (action) => {
         config.RATE_LIMIT.WINDOW_MS
       );
 
-      // Добавляем заголовки
       res.set({
         "RateLimit-Limit": limit,
         "RateLimit-Remaining": Math.max(0, result.remaining),
@@ -304,7 +319,6 @@ export const checkCustomRateLimit = (action) => {
       next();
     } catch (error) {
       console.error("Custom rate limit error:", error);
-      // При ошибке rate limiting пропускаем запрос
       next();
     }
   };

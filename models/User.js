@@ -17,7 +17,6 @@ const userSchema = new mongoose.Schema(
     // ВАЖНО: без default и без unique на поле
     googleId: {
       type: String,
-      index: true,
     },
 
     // Основные поля
@@ -38,7 +37,6 @@ const userSchema = new mongoose.Schema(
       minlength: 3,
       maxlength: 30,
       match: /^[a-zA-Z0-9_]+$/,
-      index: true,
     },
 
     // Пароль для локальной авторизации
