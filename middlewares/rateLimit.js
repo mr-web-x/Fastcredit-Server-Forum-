@@ -225,7 +225,7 @@ export const createLikeLimiter = () => {
 export const createAuthLimiter = () => {
   return rateLimit({
     windowMs: 15 * 60 * 1000,
-    limit: 5,
+    limit: 500,
     keyGenerator: (req) => getClientIP(req),
     standardHeaders: "draft-8",
     legacyHeaders: false,

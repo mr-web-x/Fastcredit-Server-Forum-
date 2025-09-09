@@ -8,18 +8,31 @@ import { logSecurityEvent } from "./logger.js";
 
 // Извлечение токена из заголовка Authorization
 const extractToken = (req) => {
+  // Сначала проверяем Authorization header
   const authHeader = req.headers.authorization;
 
-  if (!authHeader) {
-    return null;
+  if (authHeader) {
+    if (authHeader.startsWith("Bearer ")) {
+      return authHeader.substring(7);
+    }
+    return authHeader;
   }
 
-  // Поддерживаем форматы: "Bearer token" или просто "token"
-  if (authHeader.startsWith("Bearer ")) {
-    return authHeader.substring(7);
+  // Парсим cookies вручную если req.cookies недоступен
+  const cookieHeader = req.headers.cookie;
+  if (cookieHeader) {
+    const cookies = cookieHeader.split(";").reduce((acc, cookie) => {
+      const [name, value] = cookie.trim().split("=");
+      acc[name] = value;
+      return acc;
+    }, {});
+
+    if (cookies.fc_jwt) {
+      return cookies.fc_jwt;
+    }
   }
 
-  return authHeader;
+  return null;
 };
 
 // Верификация JWT токена

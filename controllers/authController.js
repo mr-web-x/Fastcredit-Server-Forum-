@@ -512,25 +512,6 @@ class AuthController {
         );
       }
 
-      // Отправляем email с кодом сброса пароля
-      if (result.devCode) {
-        try {
-          await emailService.sendEmail(
-            email,
-            "passwordReset",
-            "Fastcredit.sk",
-            { code: result.devCode }
-          );
-
-          logUserAction(
-            null,
-            "PASSWORD_RESET_EMAIL_SENT",
-            `Password reset email sent to ${email}`
-          );
-        } catch (emailError) {
-          console.error("Failed to send password reset email:", emailError);
-        }
-      }
 
       res.json(
         formatResponse(

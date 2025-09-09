@@ -219,12 +219,20 @@ class VerificationService {
         requestIP
       );
 
-      // TODO: Здесь отправляем email
-      // await emailService.sendMessage(email, {
-      //   subject: 'Сброс пароля',
-      //   template: 'password_reset',
-      //   data: { code: verificationCode.code }
-      // });
+      try {
+        await emailService.sendEmail(email, "passwordReset", "Fastcredit.sk", {
+          code: verificationCode.code,
+        });
+
+        logUserAction(
+          null,
+          "PASSWORD_RESET_EMAIL_SENT",
+          `Password reset email sent to ${email}`
+        );
+      } catch (emailError) {
+        console.error("Failed to send password reset email:", emailError);
+        console.log("Verification code:", verificationCode.code);
+      }
 
       logUserAction(
         user._id,
