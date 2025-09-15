@@ -21,6 +21,9 @@ class QuestionController {
       priority,
       author,
       hasAnswer,
+      hasApprovedAnswers,
+      hasPendingAnswers,
+      includeAnswersCounters,
       sortBy = "createdAt",
       sortOrder = -1,
       search,
@@ -35,6 +38,19 @@ class QuestionController {
       author,
       hasAnswer:
         hasAnswer === "true" ? true : hasAnswer === "false" ? false : null,
+      hasApprovedAnswers:
+        hasApprovedAnswers === "true"
+          ? true
+          : hasApprovedAnswers === "false"
+          ? false
+          : null,
+      hasPendingAnswers:
+        hasPendingAnswers === "true"
+          ? true
+          : hasPendingAnswers === "false"
+          ? false
+          : null,
+      includeAnswersCounters: includeAnswersCounters === "true",
       sortBy,
       sortOrder: parseInt(sortOrder),
       search,

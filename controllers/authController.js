@@ -512,7 +512,6 @@ class AuthController {
         );
       }
 
-
       res.json(
         formatResponse(
           true,
@@ -685,12 +684,10 @@ class AuthController {
 
   // Обновление профиля - ДОБАВЛЯЕМ
   updateProfile = asyncHandler(async (req, res) => {
-    const { firstName, lastName, username, bio } = req.body;
+    const { username, bio } = req.body;
 
     try {
       const updatedUser = await authService.updateUserProfile(req.user._id, {
-        firstName,
-        lastName,
         username,
         bio,
       });

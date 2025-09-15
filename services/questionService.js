@@ -44,7 +44,7 @@ class QuestionService {
       // Загружаем вопрос с автором
       const populatedQuestion = await Question.findById(question._id).populate(
         "author",
-        "email role avatar"
+        "firstName lastName email role avatar"
       );
 
       logUserAction(
@@ -65,7 +65,7 @@ class QuestionService {
     try {
       const question = await Question.findOne({ slug }).populate(
         "author",
-        "email role avatar bio rating"
+        "firstName lastName email role avatar bio rating"
       );
 
       if (!question) {
@@ -95,12 +95,26 @@ class QuestionService {
         priority = null,
         author = null,
         hasAnswer = null,
+        hasApprovedAnswers = null,
+        hasPendingAnswers = null,
+        includeAnswersCounters = false, // Новый параметр для админ-панели
         sortBy = "createdAt",
         sortOrder = -1,
         search = null,
       } = options;
 
       const skip = (page - 1) * limit;
+
+      // Используем aggregation если нужны фильтры по ответам ИЛИ счетчики для админов
+      if (
+        hasApprovedAnswers !== null ||
+        hasPendingAnswers !== null ||
+        includeAnswersCounters
+      ) {
+        return await this.getQuestionsWithAnswersAggregation(options);
+      }
+
+      // Обычный запрос без фильтров по ответам (для публичной страницы)
       const query = {};
 
       // Фильтры
@@ -117,7 +131,7 @@ class QuestionService {
 
       const [questions, total] = await Promise.all([
         Question.find(query)
-          .populate("author", "email role avatar")
+          .populate("author", "firstName lastName email role avatar")
           .sort(
             search ? { score: { $meta: "textScore" } } : { [sortBy]: sortOrder }
           )
@@ -133,6 +147,162 @@ class QuestionService {
     }
   }
 
+  // Метод с aggregation для фильтров по ответам и счетчиков
+  async getQuestionsWithAnswersAggregation(options = {}) {
+    try {
+      const {
+        page = 1,
+        limit = 20,
+        status = null,
+        category = null,
+        priority = null,
+        author = null,
+        hasAnswer = null,
+        hasApprovedAnswers = null,
+        hasPendingAnswers = null,
+        sortBy = "createdAt",
+        sortOrder = -1,
+        search = null,
+      } = options;
+
+      const skip = (page - 1) * limit;
+
+      // Базовый pipeline
+      const pipeline = [
+        // Lookup к таблице ответов
+        {
+          $lookup: {
+            from: "answers",
+            localField: "_id",
+            foreignField: "questionId",
+            as: "answers",
+          },
+        },
+
+        // Добавляем подсчетные поля и упрощенные ответы
+        {
+          $addFields: {
+            approvedAnswersCount: {
+              $size: {
+                $filter: {
+                  input: "$answers",
+                  cond: { $eq: ["$$this.isApproved", true] },
+                },
+              },
+            },
+            pendingAnswersCount: {
+              $size: {
+                $filter: {
+                  input: "$answers",
+                  cond: { $eq: ["$$this.isApproved", false] },
+                },
+              },
+            },
+            // Упрощенный массив ответов только с нужными полями
+            userAnswers: {
+              $map: {
+                input: "$answers",
+                as: "answer",
+                in: {
+                  _id: "$$answer._id",
+                  expert: "$$answer.expert",
+                  isApproved: "$$answer.isApproved",
+                  isAccepted: "$$answer.isAccepted",
+                },
+              },
+            },
+          },
+        },
+
+        // Удаляем полный массив answers для экономии трафика
+        { $unset: "answers" },
+      ];
+
+      // Строим фильтры
+      const matchQuery = {};
+
+      if (status) matchQuery.status = status;
+      if (category) matchQuery.category = category;
+      if (priority) matchQuery.priority = priority;
+      if (author) matchQuery.author = author;
+      if (hasAnswer !== null) matchQuery.hasAcceptedAnswer = hasAnswer;
+
+      // Фильтры по ответам
+      if (hasApprovedAnswers === true) {
+        matchQuery.approvedAnswersCount = { $gt: 0 };
+      } else if (hasApprovedAnswers === false) {
+        matchQuery.approvedAnswersCount = 0;
+      }
+
+      if (hasPendingAnswers === true) {
+        matchQuery.pendingAnswersCount = { $gt: 0 };
+      } else if (hasPendingAnswers === false) {
+        matchQuery.pendingAnswersCount = 0;
+      }
+
+      // Поиск по тексту
+      if (search) {
+        matchQuery.$text = { $search: search };
+      }
+
+      // Добавляем фильтры в pipeline
+      if (Object.keys(matchQuery).length > 0) {
+        pipeline.push({ $match: matchQuery });
+      }
+
+      // Populate автора
+      pipeline.push({
+        $lookup: {
+          from: "users",
+          localField: "author",
+          foreignField: "_id",
+          as: "author",
+          pipeline: [
+            {
+              $project: {
+                firstName: 1,
+                lastName: 1,
+                email: 1,
+                role: 1,
+                avatar: 1,
+              },
+            },
+          ],
+        },
+      });
+
+      // Разворачиваем автора
+      pipeline.push({ $unwind: "$author" });
+
+      // Сортировка
+      if (search) {
+        pipeline.push({ $sort: { score: { $meta: "textScore" } } });
+      } else {
+        pipeline.push({ $sort: { [sortBy]: sortOrder } });
+      }
+
+      // Для подсчета общего количества создаем отдельный pipeline
+      const countPipeline = [...pipeline];
+      countPipeline.push({ $count: "total" });
+
+      // Добавляем пагинацию
+      pipeline.push({ $skip: skip });
+      pipeline.push({ $limit: limit });
+
+      const [questionsResult, countResult] = await Promise.all([
+        Question.aggregate(pipeline),
+        Question.aggregate(countPipeline),
+      ]);
+
+      const total = countResult[0]?.total || 0;
+      const questions = questionsResult;
+
+      return createPaginationResponse(questions, total, page, limit);
+    } catch (error) {
+      logError(error, "QuestionService.getQuestionsWithAnswersAggregation");
+      throw error;
+    }
+  }
   // Получение вопросов в ожидании ответа
   async getPendingQuestions(options = {}) {
     try {
@@ -144,7 +314,7 @@ class QuestionService {
 
       const [questions, total] = await Promise.all([
         Question.find(query)
-          .populate("author", "email role avatar")
+          .populate("author", "firstName lastName email role avatar")
           .sort({ priority: -1, createdAt: -1 })
           .skip(skip)
           .limit(limit),
@@ -194,7 +364,7 @@ class QuestionService {
 
       return await Question.findById(questionId).populate(
         "author",
-        "email role avatar"
+        "firstName lastName email role avatar"
       );
     } catch (error) {
       logError(error, "QuestionService.updateQuestion", userId);
@@ -269,7 +439,7 @@ class QuestionService {
 
       const [questions, total] = await Promise.all([
         Question.find(query)
-          .populate("author", "email role avatar")
+          .populate("author", "firstName lastName email role avatar")
           .sort({ score: { $meta: "textScore" } })
           .skip(skip)
           .limit(limit),
@@ -357,7 +527,7 @@ class QuestionService {
       };
 
       const similarQuestions = await Question.find(query)
-        .populate("author", "email role avatar")
+        .populate("author", "firstName lastName email role avatar")
         .sort({ likes: -1, views: -1 })
         .limit(limit);
 
@@ -393,7 +563,7 @@ class QuestionService {
 
       return await Question.findById(questionId).populate(
         "author",
-        "email role avatar"
+        "firstName lastName email role avatar"
       );
     } catch (error) {
       logError(error, "QuestionService.changeQuestionStatus", userId);
@@ -460,7 +630,7 @@ class QuestionService {
 
       const [questions, total] = await Promise.all([
         Question.find(query)
-          .populate("author", "email role avatar")
+          .populate("author", "firstName lastName email role avatar")
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit),
@@ -487,7 +657,7 @@ class QuestionService {
       }
 
       const questions = await Question.find(dateFilter)
-        .populate("author", "email role avatar")
+        .populate("author", "firstName lastName email role avatar")
         .sort({ [sortBy]: -1, views: -1 })
         .limit(limit);
 

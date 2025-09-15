@@ -43,7 +43,7 @@ class CommentService {
 
       // Загружаем комментарий с автором
       const populatedComment = await Comment.findById(comment._id)
-        .populate("author", "email role avatar")
+        .populate("author", "firstName lastName email role avatar")
         .populate("parentComment", "content author");
 
       logUserAction(
@@ -72,7 +72,7 @@ class CommentService {
       }
 
       const comments = await Comment.find(query)
-        .populate("author", "email role avatar")
+        .populate("author", "firstName lastName email role avatar")
         .populate({
           path: "replies",
           match: includeUnapproved ? {} : { isApproved: true },
@@ -103,7 +103,7 @@ class CommentService {
       }
 
       const replies = await Comment.find(query)
-        .populate("author", "email role avatar")
+        .populate("author", "firstName lastName email role avatar")
         .sort({ createdAt: 1 });
 
       return replies;
@@ -244,7 +244,7 @@ class CommentService {
       );
 
       return await Comment.findById(commentId)
-        .populate("author", "email role avatar")
+        .populate("author", "firstName lastName email role avatar")
         .populate("moderatedBy", "email role");
     } catch (error) {
       logError(error, "CommentService.moderateComment", moderatorId);
@@ -260,7 +260,7 @@ class CommentService {
 
       const [comments, total] = await Promise.all([
         Comment.find({ isApproved: false })
-          .populate("author", "email role avatar")
+          .populate("author", "firstName lastName email role avatar")
           .populate("questionId", "title slug")
           .sort({ createdAt: -1 })
           .skip(skip)
@@ -380,7 +380,7 @@ class CommentService {
 
       const [comments, total] = await Promise.all([
         Comment.find(query)
-          .populate("author", "email role avatar")
+          .populate("author", "firstName lastName email role avatar")
           .populate("questionId", "title slug")
           .sort({ createdAt: -1 })
           .skip(skip)
@@ -404,7 +404,7 @@ class CommentService {
         isApproved: true,
         likes: { $gte: minLikes },
       })
-        .populate("author", "email role avatar")
+        .populate("author", "firstName lastName email role avatar")
         .populate("questionId", "title slug")
         .sort({ likes: -1, createdAt: -1 })
         .limit(limit);

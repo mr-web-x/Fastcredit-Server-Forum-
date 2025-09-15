@@ -530,13 +530,7 @@ class AuthService {
       }
 
       // Разрешенные поля для обновления
-      const allowedFields = [
-        "firstName",
-        "lastName",
-        "username",
-        "bio",
-        "avatar",
-      ];
+      const allowedFields = ["username", "bio", "avatar"];
 
       const updateObject = {};
       for (const field of allowedFields) {

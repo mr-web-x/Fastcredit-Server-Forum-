@@ -23,6 +23,15 @@ class AnswerService {
         throw new Error("Cannot answer your own question");
       }
 
+      const existingAnswer = await Answer.findOne({
+        questionId: questionId,
+        expert: expertId,
+      });
+
+      if (existingAnswer) {
+        throw new Error("You have already answered this question");
+      }
+
       // Проверяем права эксперта
       const expert = await User.findById(expertId);
       if (!expert.isExpert()) {
@@ -41,7 +50,7 @@ class AnswerService {
 
       // Загружаем ответ с экспертом и вопросом
       const populatedAnswer = await Answer.findById(answer._id)
-        .populate("expert", "email role avatar bio rating")
+        .populate("expert", "firstName lastName email role avatar bio rating")
         .populate("questionId", "title slug");
 
       logUserAction(
@@ -74,7 +83,10 @@ class AnswerService {
       }
 
       const answers = await Answer.find(query)
-        .populate("expert", "email role avatar bio rating totalAnswers")
+        .populate(
+          "expert",
+          "firstName lastName email role avatar bio rating totalAnswers"
+        )
         .sort({ [sortBy]: sortOrder, likes: -1, createdAt: -1 });
 
       return answers;
@@ -148,8 +160,34 @@ class AnswerService {
         );
       }
 
+      const question = await Question.findById(answer.questionId);
+
+      if (isApproved && !oldStatus) {
+        // Одобрили: false → true
+        await question.incrementAnswers();
+      } else if (!isApproved && oldStatus) {
+        // Отклонили: true → false
+        await question.decrementAnswers();
+      }
+
+      if (!isApproved && oldStatus) {
+        const remainingApprovedAnswers = await Answer.countDocuments({
+          questionId: answer.questionId._id,
+          isApproved: true,
+        });
+
+        const newStatus =
+          remainingApprovedAnswers > 0
+            ? QUESTION_STATUS.ANSWERED
+            : QUESTION_STATUS.PENDING;
+
+        await Question.findByIdAndUpdate(answer.questionId._id, {
+          status: newStatus,
+        });
+      }
+
       return await Answer.findById(answerId)
-        .populate("expert", "email role avatar")
+        .populate("expert", "firstName lastName email role avatar")
         .populate("moderatedBy", "email role")
         .populate("questionId", "title slug");
     } catch (error) {
@@ -159,62 +197,73 @@ class AnswerService {
   }
 
   // Принятие ответа как лучшего (только автор вопроса)
-  async acceptAnswer(answerId, userId) {
-    try {
-      const answer = await Answer.findById(answerId)
-        .populate("questionId")
-        .populate("expert");
+// Принятие ответа как лучшего (только автор вопроса)
+async acceptAnswer(answerId, userId) {
+  try {
+    const answer = await Answer.findById(answerId)
+      .populate("questionId")
+      .populate("expert");
 
-      if (!answer) {
-        throw new Error("Answer not found");
-      }
-
-      if (!answer.isApproved) {
-        throw new Error("Cannot accept unapproved answer");
-      }
-
-      // Проверяем, что пользователь - автор вопроса
-      if (answer.questionId.author.toString() !== userId.toString()) {
-        throw new Error("Only question author can accept answers");
-      }
-
-      if (answer.questionId.hasAcceptedAnswer) {
-        throw new Error("Question already has accepted answer");
-      }
-
-      // Принимаем ответ
-      await answer.accept();
-
-      // Увеличиваем рейтинг эксперта
-      const expert = await User.findById(answer.expert._id);
-      await expert.updateRating(expert.rating + 10); // +10 за принятый ответ
-
-      logUserAction(
-        userId,
-        "ANSWER_ACCEPTED",
-        `Accepted answer ${answerId} from expert ${answer.expert.email}`
-      );
-
-      return await Answer.findById(answerId)
-        .populate("expert", "email role avatar bio rating")
-        .populate("questionId", "title slug");
-    } catch (error) {
-      logError(error, "AnswerService.acceptAnswer", userId);
-      throw error;
+    if (!answer) {
+      throw new Error("Answer not found");
     }
-  }
 
-  // Обновление ответа (только автор или админ)
+    if (!answer.isApproved) {
+      throw new Error("Cannot accept unapproved answer");
+    }
+
+    // Проверяем, что пользователь - автор вопроса
+    if (answer.questionId.author.toString() !== userId.toString()) {
+      throw new Error("Only question author can accept answers");
+    }
+
+    if (answer.questionId.hasAcceptedAnswer) {
+      throw new Error("Question already has accepted answer");
+    }
+
+    // Принимаем ответ
+    await answer.accept();
+
+    // Обновляем статус вопроса
+    await Question.findByIdAndUpdate(answer.questionId._id, {
+      hasAcceptedAnswer: true,
+      status: QUESTION_STATUS.ANSWERED
+    });
+
+    // Увеличиваем рейтинг эксперта
+    const expert = await User.findById(answer.expert._id);
+    await expert.updateRating(expert.rating + 10); // +10 за принятый ответ
+
+    logUserAction(
+      userId,
+      "ANSWER_ACCEPTED",
+      `Accepted answer ${answerId} from expert ${answer.expert.email}`
+    );
+
+    return await Answer.findById(answerId)
+      .populate("expert", "firstName lastName email role avatar bio rating")
+      .populate("questionId", "title slug");
+  } catch (error) {
+    logError(error, "AnswerService.acceptAnswer", userId);
+    throw error;
+  }
+}
+
+  // Файл: services/AnswerService.js (на бэкенде)
+
   async updateAnswer(answerId, updateData, userId) {
     try {
       const answer = await Answer.findById(answerId);
-
       if (!answer) {
         throw new Error("Answer not found");
       }
 
-      // Проверяем права (автор ответа или админ)
       const user = await User.findById(userId);
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // Проверяем права (автор ответа или админ)
       const canEdit =
         answer.expert.toString() === userId.toString() || user.role === "admin";
 
@@ -222,32 +271,42 @@ class AnswerService {
         throw new Error("No permission to edit this answer");
       }
 
-      // Если ответ уже одобрен и это не админ, запрещаем редактирование
-      if (answer.isApproved && user.role !== "admin") {
-        throw new Error("Cannot edit approved answer");
-      }
-
       const { content } = updateData;
-      if (!content) {
+      if (!content || content.trim().length === 0) {
         throw new Error("Content is required");
       }
 
-      answer.content = content;
+      if (content.trim().length < 50) {
+        throw new Error("Answer must be at least 50 characters long");
+      }
 
-      // Если ответ был одобрен, сбрасываем одобрение для повторной модерации
+      if (content.trim().length > 5000) {
+        throw new Error("Answer cannot exceed 5000 characters");
+      }
+
+      // Обновляем контент
+      answer.content = content.trim();
+
+      // Если одобренный ответ редактирует эксперт → сбрасываем одобрение
       if (answer.isApproved && user.role !== "admin") {
         answer.isApproved = false;
         answer.moderatedBy = null;
         answer.moderatedAt = null;
         answer.moderationComment = null;
+
+        const question = await Question.findById(answer.questionId);
+        await question.decrementAnswers();
       }
+
+      // Обновляем дату изменения
+      answer.updatedAt = new Date();
 
       await answer.save();
 
       logUserAction(userId, "ANSWER_UPDATED", `Updated answer ${answerId}`);
 
       return await Answer.findById(answerId)
-        .populate("expert", "email role avatar")
+        .populate("expert", "firstName lastName email role avatar")
         .populate("questionId", "title slug");
     } catch (error) {
       logError(error, "AnswerService.updateAnswer", userId);
@@ -273,11 +332,42 @@ class AnswerService {
         throw new Error("No permission to delete this answer");
       }
 
+      if (answer.wasApproved && user.role !== "admin") {
+        throw new Error("Cannot delete answer that was previously approved");
+      }
+
       // Если это принятый ответ, сбрасываем статус у вопроса
       if (answer.isAccepted) {
         await Question.findByIdAndUpdate(answer.questionId._id, {
           hasAcceptedAnswer: false,
+          status: QUESTION_STATUS.PENDING, // Сбрасываем статус, так как принятый ответ удален
         });
+      }
+
+      const question = await Question.findById(answer.questionId._id);
+
+      // Если удаляем одобренный ответ, уменьшаем счетчик
+      if (answer.isApproved) {
+        await question.decrementAnswers();
+
+        // Пересчитываем статус вопроса на основе оставшихся одобренных ответов
+        const remainingApprovedAnswers = await Answer.countDocuments({
+          questionId: answer.questionId._id,
+          isApproved: true,
+          _id: { $ne: answerId }, // Исключаем удаляемый ответ
+        });
+
+        // Обновляем статус вопроса (только если это не принятый ответ, который уже обработан выше)
+        if (!answer.isAccepted) {
+          const newStatus =
+            remainingApprovedAnswers > 0
+              ? QUESTION_STATUS.ANSWERED
+              : QUESTION_STATUS.PENDING;
+
+          await Question.findByIdAndUpdate(answer.questionId._id, {
+            status: newStatus,
+          });
+        }
       }
 
       // Удаляем ответ (это также запустит pre-remove middleware)
@@ -300,7 +390,7 @@ class AnswerService {
 
       const [answers, total] = await Promise.all([
         Answer.find({ isApproved: false })
-          .populate("expert", "email role avatar")
+          .populate("expert", "firstName lastName email role avatar")
           .populate("questionId", "title slug")
           .sort({ createdAt: -1 })
           .skip(skip)

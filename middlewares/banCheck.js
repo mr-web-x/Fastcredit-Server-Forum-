@@ -140,6 +140,7 @@ export const checkUserCanModerate = (req, res, next) => {
       .json(formatResponse(false, null, ERROR_MESSAGES.UNAUTHORIZED));
   }
 
+
   if (!req.user.canModerate) {
     let message;
     if (!req.user.isAdmin) {

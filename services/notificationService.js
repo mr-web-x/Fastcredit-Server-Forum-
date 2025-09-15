@@ -56,7 +56,7 @@ class NotificationService {
     try {
       const answer = await Answer.findById(answerId)
         .populate("questionId")
-        .populate("expert", "email role avatar");
+        .populate("expert", "firstName lastName email role avatar");
 
       if (!answer) {
         throw new Error("Answer not found");

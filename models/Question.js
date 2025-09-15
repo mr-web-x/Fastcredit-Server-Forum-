@@ -193,19 +193,19 @@ questionSchema.methods.decrementComments = async function () {
 // Статические методы
 questionSchema.statics.findByStatus = function (status) {
   return this.find({ status })
-    .populate("author", "email role avatar")
+    .populate("author", "firstName lastName email role avatar")
     .sort({ createdAt: -1 });
 };
 
 questionSchema.statics.findPending = function () {
   return this.find({ status: QUESTION_STATUS.PENDING })
-    .populate("author", "email role avatar")
+    .populate("author", "firstName lastName email role avatar")
     .sort({ priority: -1, createdAt: -1 });
 };
 
 questionSchema.statics.findAnswered = function () {
   return this.find({ status: QUESTION_STATUS.ANSWERED })
-    .populate("author", "email role avatar")
+    .populate("author", "firstName lastName email role avatar")
     .sort({ answeredAt: -1 });
 };
 
@@ -218,7 +218,7 @@ questionSchema.statics.search = function (query, limit = 10) {
     { $text: { $search: query } },
     { score: { $meta: "textScore" } }
   )
-    .populate("author", "email role avatar")
+    .populate("author", "firstName lastName email role avatar")
     .sort({ score: { $meta: "textScore" } })
     .limit(limit);
 };

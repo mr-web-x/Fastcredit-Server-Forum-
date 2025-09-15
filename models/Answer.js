@@ -50,6 +50,11 @@ const answerSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    wasApproved: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   {
     timestamps: true,
@@ -76,13 +81,13 @@ answerSchema.virtual("isPublished").get(function () {
 // Методы экземпляра
 answerSchema.methods.approve = async function (moderatorId, comment = null) {
   this.isApproved = true;
+  this.wasApproved = true;
   this.moderatedBy = moderatorId;
   this.moderatedAt = new Date();
   this.moderationComment = comment;
 
   // Обновляем статус вопроса и счетчик ответов
   await mongoose.model("Question").findByIdAndUpdate(this.questionId, {
-    $inc: { answersCount: 1 },
     status: "answered",
     answeredAt: new Date(),
   });
@@ -135,14 +140,14 @@ answerSchema.methods.decrementLikes = async function () {
 // Статические методы
 answerSchema.statics.findPendingModeration = function () {
   return this.find({ isApproved: false })
-    .populate("expert", "email role avatar")
+    .populate("expert", "firstName lastName email role avatar")
     .populate("questionId", "title slug")
     .sort({ createdAt: -1 });
 };
 
 answerSchema.statics.findByQuestion = function (questionId) {
   return this.find({ questionId, isApproved: true })
-    .populate("expert", "email role avatar bio rating")
+    .populate("expert", "firstName lastName email role avatar bio rating")
     .sort({ isAccepted: -1, likes: -1, createdAt: -1 });
 };
 

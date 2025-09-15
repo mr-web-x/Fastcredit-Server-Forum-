@@ -54,7 +54,7 @@ const verifyToken = (token) => {
 export const authenticate = async (req, res, next) => {
   try {
     const token = extractToken(req);
-
+    console.log(req.body);
     if (!token) {
       logSecurityEvent(
         "UNAUTHORIZED_ACCESS",

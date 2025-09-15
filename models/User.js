@@ -218,6 +218,10 @@ userSchema.methods.canAccessFeatures = function () {
   return this.isEmailVerified && this.isActive && !this.isBannedCurrently();
 };
 
+userSchema.methods.canModerate = function () {
+  return this.role === USER_ROLES.ADMIN;
+};
+
 // Статистика
 userSchema.methods.incrementQuestionCount = function () {
   this.totalQuestions += 1;

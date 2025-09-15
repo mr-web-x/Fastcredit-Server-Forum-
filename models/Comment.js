@@ -101,7 +101,7 @@ commentSchema.statics.findByQuestion = function (questionId) {
     isApproved: true,
     parentComment: null,
   })
-    .populate("author", "email role avatar")
+    .populate("author", "firstName lastName email role avatar")
     .populate({
       path: "replies",
       populate: {
@@ -117,7 +117,7 @@ commentSchema.statics.findReplies = function (parentCommentId) {
     parentComment: parentCommentId,
     isApproved: true,
   })
-    .populate("author", "email role avatar")
+    .populate("author", "firstName lastName email role avatar")
     .sort({ createdAt: 1 });
 };
 
@@ -129,7 +129,7 @@ commentSchema.statics.findByAuthor = function (authorId) {
 
 commentSchema.statics.findPendingModeration = function () {
   return this.find({ isApproved: false })
-    .populate("author", "email role avatar")
+    .populate("author", "firstName lastName email role avatar")
     .populate("questionId", "title slug")
     .sort({ createdAt: -1 });
 };
