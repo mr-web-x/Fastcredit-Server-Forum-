@@ -2,7 +2,7 @@
 module.exports = {
   apps: [
     {
-      name: "forum-fastcredit-sk",
+      name: "[fastcredit-sk]-root-server",
       script: "./server.js",
       env: {
         NODE_ENV: "production",

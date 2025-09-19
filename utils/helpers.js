@@ -59,6 +59,7 @@ export const createPaginationResponse = (data, total, page, limit) => {
   return {
     data,
     pagination: {
+      limit,
       current: page,
       total: totalPages,
       count: data.length,

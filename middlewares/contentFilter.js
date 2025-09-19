@@ -68,7 +68,7 @@ const deobfuscateText = (text) => {
 };
 
 // Удаление опасного HTML
-const sanitizeHtml = (text) => {
+const sanitizeHtmlContent = (text) => {
   let cleanText = text;
 
   // Удаляем опасные теги и атрибуты
@@ -167,7 +167,7 @@ export const filterContent = (options = {}) => {
 
           // Санитизация HTML
           if (sanitizeHtml) {
-            text = sanitizeHtml(text);
+            text = sanitizeHtmlContent(text);
             if (text !== originalText) {
               issues.push({
                 field,
