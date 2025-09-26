@@ -28,7 +28,7 @@ const handleValidationError = (error) => {
 
   return {
     statusCode: HTTP_STATUS.BAD_REQUEST,
-    message: ERROR_MESSAGES.VALIDATION_ERROR,
+    message: "Chyba validácie údajov",
     details: {
       type: "ValidationError",
       errors,
@@ -38,16 +38,16 @@ const handleValidationError = (error) => {
 
 // Обработка ошибок приведения типов
 const handleCastError = (error) => {
-  let message = "Неверный формат данных";
+  let message = "Nesprávny formát údajov";
 
   if (error.path === "_id") {
-    message = "Неверный ID объекта";
+    message = "Nesprávne ID objektu";
   } else if (error.kind === "ObjectId") {
-    message = `Неверный формат ID для поля ${error.path}`;
+    message = `Nesprávny formát ID pre pole ${error.path}`;
   } else if (error.kind === "Number") {
-    message = `Ожидается число для поля ${error.path}`;
+    message = `Očakáva sa číslo pre pole ${error.path}`;
   } else if (error.kind === "Date") {
-    message = `Неверный формат даты для поля ${error.path}`;
+    message = `Nesprávny formát dátumu pre pole ${error.path}`;
   }
 
   return {
@@ -67,18 +67,18 @@ const handleDuplicateError = (error) => {
   const field = Object.keys(error.keyValue)[0];
   const value = error.keyValue[field];
 
-  let message = `Значение "${value}" уже существует`;
+  let message = `Hodnota "${value}" už existuje`;
 
   // Настройка сообщений для конкретных полей
   switch (field) {
     case "email":
-      message = "Пользователь с таким email уже существует";
+      message = "Používateľ s týmto emailom už existuje";
       break;
     case "slug":
-      message = "Объект с таким идентификатором уже существует";
+      message = "Objekt s týmto identifikátorom už existuje";
       break;
     case "name":
-      message = "Объект с таким именем уже существует";
+      message = "Objekt s týmto menom už existuje";
       break;
   }
 
@@ -95,15 +95,15 @@ const handleDuplicateError = (error) => {
 
 // Обработка ошибок JWT
 const handleJwtError = (error) => {
-  let message = ERROR_MESSAGES.INVALID_TOKEN;
+  let message = "Neplatný token";
   let statusCode = HTTP_STATUS.UNAUTHORIZED;
 
   if (error.name === "TokenExpiredError") {
-    message = "Токен истек. Необходимо войти заново";
+    message = "Token vypršal. Prosím, prihláste sa znova";
   } else if (error.message === "invalid signature") {
-    message = "Недействительная подпись токена";
+    message = "Neplatný podpis tokenu";
   } else if (error.message === "jwt malformed") {
-    message = "Неверный формат токена";
+    message = "Nesprávny formát tokenu";
   }
 
   return {
@@ -118,7 +118,7 @@ const handleJwtError = (error) => {
 
 // Обработка ошибок базы данных
 const handleDatabaseError = (error) => {
-  let message = ERROR_MESSAGES.DATABASE_ERROR;
+  let message = "Chyba databázy";
   let statusCode = HTTP_STATUS.INTERNAL_SERVER_ERROR;
 
   // Специфичные ошибки MongoDB
@@ -127,19 +127,19 @@ const handleDatabaseError = (error) => {
       case 11000:
         return handleDuplicateError(error);
       case 121:
-        message = "Документ не прошел валидацию схемы";
+        message = "Dokument neprešiel validáciou schémy";
         statusCode = HTTP_STATUS.BAD_REQUEST;
         break;
       case 2:
-        message = "Ошибка в запросе к базе данных";
+        message = "Chyba v dotaze do databázy";
         statusCode = HTTP_STATUS.BAD_REQUEST;
         break;
       case 13:
-        message = "Недостаточно прав для выполнения операции";
+        message = "Nedostatočné oprávnenia na vykonanie operácie";
         statusCode = HTTP_STATUS.FORBIDDEN;
         break;
       default:
-        message = `Ошибка базы данных (код: ${error.code})`;
+        message = `Chyba databázy (kód: ${error.code})`;
     }
   }
 
@@ -156,24 +156,24 @@ const handleDatabaseError = (error) => {
 
 // Обработка ошибок загрузки файлов
 const handleFileUploadError = (error) => {
-  let message = "Ошибка загрузки файла";
+  let message = "Chyba pri nahrávaní súboru";
   let statusCode = HTTP_STATUS.BAD_REQUEST;
 
   switch (error.code) {
     case "LIMIT_FILE_SIZE":
-      message = "Файл слишком большой";
+      message = "Súbor je príliš veľký";
       break;
     case "LIMIT_FILE_COUNT":
-      message = "Слишком много файлов";
+      message = "Príliš veľa súborov";
       break;
     case "LIMIT_UNEXPECTED_FILE":
-      message = "Неожиданное поле файла";
+      message = "Neočakávané pole súboru";
       break;
     case "MISSING_FILE":
-      message = "Файл не найден";
+      message = "Súbor nebol nájdený";
       break;
     default:
-      message = `Ошибка загрузки: ${error.message}`;
+      message = `Chyba nahrávania: ${error.message}`;
   }
 
   return {
@@ -219,7 +219,7 @@ export const errorHandler = (error, req, res, next) => {
     case "HTTP_ERROR":
       errorResponse = {
         statusCode: error.statusCode || error.status || HTTP_STATUS.BAD_REQUEST,
-        message: error.message || "HTTP ошибка",
+        message: error.message || "HTTP chyba",
         details: {
           type: "HTTPError",
         },
@@ -230,7 +230,7 @@ export const errorHandler = (error, req, res, next) => {
         statusCode: HTTP_STATUS.INTERNAL_SERVER_ERROR,
         message:
           config.NODE_ENV === "production"
-            ? ERROR_MESSAGES.INTERNAL_SERVER_ERROR
+            ? "Interná chyba servera"
             : error.message,
         details: {
           type: "InternalError",
@@ -253,7 +253,7 @@ export const errorHandler = (error, req, res, next) => {
 
 // Обработчик несуществующих маршрутов (404)
 export const notFoundHandler = (req, res, next) => {
-  const error = new Error(`Маршрут ${req.originalUrl} не найден`);
+  const error = new Error(`Trasa ${req.originalUrl} nebola nájdená`);
   error.statusCode = HTTP_STATUS.NOT_FOUND;
   next(error);
 };
@@ -292,33 +292,33 @@ export class ValidationError extends AppError {
 }
 
 export class NotFoundError extends AppError {
-  constructor(resource = "Ресурс") {
-    super(`${resource} не найден`, HTTP_STATUS.NOT_FOUND, {
+  constructor(resource = "Zdroj") {
+    super(`${resource} nebol nájdený`, HTTP_STATUS.NOT_FOUND, {
       type: "NotFoundError",
     });
   }
 }
 
 export class UnauthorizedError extends AppError {
-  constructor(message = ERROR_MESSAGES.UNAUTHORIZED) {
+  constructor(message = "Neautorizovaný prístup") {
     super(message, HTTP_STATUS.UNAUTHORIZED, { type: "UnauthorizedError" });
   }
 }
 
 export class ForbiddenError extends AppError {
-  constructor(message = ERROR_MESSAGES.FORBIDDEN) {
+  constructor(message = "Zakázané") {
     super(message, HTTP_STATUS.FORBIDDEN, { type: "ForbiddenError" });
   }
 }
 
 export class ConflictError extends AppError {
-  constructor(message = "Конфликт данных") {
+  constructor(message = "Konflikt údajov") {
     super(message, HTTP_STATUS.CONFLICT, { type: "ConflictError" });
   }
 }
 
 export class RateLimitError extends AppError {
-  constructor(message = ERROR_MESSAGES.RATE_LIMIT_EXCEEDED, resetTime = null) {
+  constructor(message = "Prekročený limit požiadaviek", resetTime = null) {
     super(message, HTTP_STATUS.TOO_MANY_REQUESTS, {
       type: "RateLimitError",
       resetTime,

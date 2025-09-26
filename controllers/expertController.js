@@ -26,7 +26,7 @@ class ExpertController {
 
     const experts = await userService.getExperts(options);
 
-    res.json(formatResponse(true, experts, "Список экспертов получен"));
+    res.json(formatResponse(true, experts, "Zoznam expertov bol získaný"));
   });
 
   // Получение профиля конкретного эксперта (публичный метод)
@@ -36,7 +36,7 @@ class ExpertController {
     // Валидация ID
     if (!isValidObjectId(expertId)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID эксперта", {
+        formatResponse(false, null, "Nesprávny formát ID experta", {
           type: "VALIDATION_ERROR",
           field: "expertId",
         })
@@ -49,7 +49,7 @@ class ExpertController {
     if (!expert.isExpert) {
       return res
         .status(404)
-        .json(formatResponse(false, null, "Эксперт не найден"));
+        .json(formatResponse(false, null, "Expert nebol nájdený"));
     }
 
     // Получаем дополнительную статистику эксперта
@@ -64,7 +64,7 @@ class ExpertController {
       bestAnswers,
     };
 
-    res.json(formatResponse(true, expertProfile, "Профиль эксперта получен"));
+    res.json(formatResponse(true, expertProfile, "Profil experta bol získaný"));
   });
 
   // Панель эксперта - общая информация (только для экспертов)
@@ -114,7 +114,7 @@ class ExpertController {
       bestAnswers,
     };
 
-    res.json(formatResponse(true, dashboardData, "Панель эксперта получена"));
+    res.json(formatResponse(true, dashboardData, "Panel experta bol získaný"));
   });
 
   // Получение вопросов в ожидании для эксперта
@@ -130,7 +130,7 @@ class ExpertController {
 
     const questions = await questionService.getPendingQuestions(options);
 
-    res.json(formatResponse(true, questions, "Вопросы в ожидании получены"));
+    res.json(formatResponse(true, questions, "Čakajúce otázky boli získané"));
   });
 
   // Получение ответов эксперта
@@ -148,7 +148,7 @@ class ExpertController {
 
     const answers = await answerService.getExpertAnswers(expertId, options);
 
-    res.json(formatResponse(true, answers, "Ответы эксперта получены"));
+    res.json(formatResponse(true, answers, "Odpovede experta boli získané"));
   });
 
   // Получение лучших ответов эксперта
@@ -162,7 +162,7 @@ class ExpertController {
     );
 
     res.json(
-      formatResponse(true, bestAnswers, "Лучшие ответы эксперта получены")
+      formatResponse(true, bestAnswers, "Najlepšie odpovede experta boli získané")
     );
   });
 
@@ -177,7 +177,7 @@ class ExpertController {
         formatResponse(
           false,
           null,
-          "Биография не может превышать 500 символов",
+          "Biografia nemôže presiahnuť 500 znakov",
           {
             type: "VALIDATION_ERROR",
             field: "bio",
@@ -193,10 +193,10 @@ class ExpertController {
       req.user
     );
 
-    logUserAction(expertId, "EXPERT_BIO_UPDATED", "Expert updated their bio");
+    logUserAction(expertId, "EXPERT_BIO_UPDATED", "Expert aktualizoval svoju biografiu");
 
     res.json(
-      formatResponse(true, updatedExpert, "Биография эксперта обновлена")
+      formatResponse(true, updatedExpert, "Biografia experta bola aktualizovaná")
     );
   });
 
@@ -208,7 +208,7 @@ class ExpertController {
     // Валидация ID
     if (!isValidObjectId(expertId)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID эксперта", {
+        formatResponse(false, null, "Nesprávny formát ID experta", {
           type: "VALIDATION_ERROR",
           field: "expertId",
         })
@@ -226,7 +226,7 @@ class ExpertController {
     if (!expert.isExpert) {
       return res
         .status(404)
-        .json(formatResponse(false, null, "Эксперт не найден"));
+        .json(formatResponse(false, null, "Expert nebol nájdený"));
     }
 
     // Получаем детальную статистику
@@ -260,7 +260,7 @@ class ExpertController {
     };
 
     res.json(
-      formatResponse(true, expertSpecificStats, "Статистика эксперта получена")
+      formatResponse(true, expertSpecificStats, "Štatistika experta bola získaná")
     );
   });
 
@@ -274,7 +274,7 @@ class ExpertController {
         formatResponse(
           false,
           null,
-          "Поисковый запрос должен содержать минимум 2 символа",
+          "Vyhľadávací dopyt musí obsahovať aspoň 2 znaky",
           {
             type: "VALIDATION_ERROR",
             field: "query",
@@ -301,7 +301,7 @@ class ExpertController {
       formatResponse(
         true,
         filteredResults,
-        "Результаты поиска экспертов получены"
+        "Výsledky vyhľadávania expertov boli získané"
       )
     );
   });
@@ -314,7 +314,7 @@ class ExpertController {
     // Валидация ID
     if (!isValidObjectId(expertId)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID эксперта", {
+        formatResponse(false, null, "Nesprávny formát ID experta", {
           type: "VALIDATION_ERROR",
           field: "expertId",
         })
@@ -325,7 +325,7 @@ class ExpertController {
     if (!expert.isExpert) {
       return res
         .status(404)
-        .json(formatResponse(false, null, "Эксперт не найден"));
+        .json(formatResponse(false, null, "Expert nebol nájdený"));
     }
 
     const options = { page, limit };
@@ -351,7 +351,7 @@ class ExpertController {
     };
 
     res.json(
-      formatResponse(true, publicActivity, "Активность эксперта получена")
+      formatResponse(true, publicActivity, "Aktivita experta bola získaná")
     );
   });
 }

@@ -26,7 +26,7 @@ export const requireRole = (role) => {
           formatResponse(
             false,
             null,
-            `Доступ разрешен только для роли: ${role}`
+            `Prístup povolený iba pre rolu: ${role}`
           )
         );
     }
@@ -62,7 +62,7 @@ export const requireAnyRole = (roles) => {
           formatResponse(
             false,
             null,
-            `Доступ разрешен только для ролей: ${allowedRoles.join(", ")}`
+            `Prístup povolený iba pre role: ${allowedRoles.join(", ")}`
           )
         );
     }
@@ -104,7 +104,7 @@ export const requireModerator = (req, res, next) => {
 
     return res
       .status(403)
-      .json(formatResponse(false, null, "Недостаточно прав для модерации"));
+      .json(formatResponse(false, null, "Nedostatok práv na moderovanie"));
   }
 
   next();
@@ -150,7 +150,7 @@ export const requireOwnerOrAdmin = (getOwnerId) => {
             formatResponse(
               false,
               null,
-              "Вы можете изменять только свой контент"
+              "Môžete upravovať iba svoj obsah"
             )
           );
       }
@@ -191,7 +191,7 @@ export const requireQuestionAuthorOrAdmin = (getQuestionAuthor) => {
             formatResponse(
               false,
               null,
-              "Только автор вопроса или админ может принять ответ"
+              "Odpoveď môže prijať iba autor otázky alebo admin"
             )
           );
       }
@@ -237,7 +237,7 @@ export const requireMinRole = (minRole) => {
       return res
         .status(403)
         .json(
-          formatResponse(false, null, `Требуется минимальная роль: ${minRole}`)
+          formatResponse(false, null, `Vyžaduje sa minimálna rola: ${minRole}`)
         );
     }
 
@@ -254,14 +254,14 @@ export const requireCanAnswer = (req, res, next) => {
   }
 
   if (!req.user.canAnswer) {
-    let message = "Недостаточно прав для ответа на вопросы";
+    let message = "Nedostatok práv na odpovedanie na otázky";
 
     if (req.user.role === USER_ROLES.USER) {
-      message = "Только эксперты и админы могут отвечать на вопросы";
+      message = "Odpovedať na otázky môžu iba experti a administrátori";
     } else if (!req.user.isActive) {
-      message = "Аккаунт деактивирован";
+      message = "Účet je deaktivovaný";
     } else if (req.user.isBannedCurrently()) {
-      message = "Аккаунт заблокирован";
+      message = "Účet je zablokovaný";
     }
 
     return res.status(403).json(
@@ -285,16 +285,16 @@ export const requireActiveUser = (req, res, next) => {
   }
 
   if (!req.user.canAccessFeatures()) {
-    let message = "Действие запрещено";
+    let message = "Akcia zakázaná";
 
     if (!req.user.isActive) {
-      message = "Аккаунт деактивирован";
+      message = "Účet je deaktivovaný";
     } else if (req.user.isBannedCurrently()) {
       const until = req.user.bannedUntil
-        ? ` до ${req.user.bannedUntil.toLocaleDateString()}`
-        : " навсегда";
-      message = `Аккаунт заблокирован${until}. Причина: ${
-        req.user.bannedReason || "не указана"
+        ? ` do ${req.user.bannedUntil.toLocaleDateString()}`
+        : " navždy";
+      message = `Účet je zablokovaný${until}. Dôvod: ${
+        req.user.bannedReason || "neuvedený"
       }`;
     }
 

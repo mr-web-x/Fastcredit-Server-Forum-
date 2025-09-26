@@ -24,7 +24,7 @@ class ReportController {
     // Валидация targetId
     if (!targetId || !isValidObjectId(targetId)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID объекта жалобы", {
+        formatResponse(false, null, "Neplatný formát ID objektu sťažnosti", {
           type: "VALIDATION_ERROR",
           field: "targetId",
         })
@@ -37,7 +37,7 @@ class ReportController {
       !Object.values(REPORT_TARGET_TYPES).includes(targetType)
     ) {
       return res.status(400).json(
-        formatResponse(false, null, "Недопустимый тип объекта", {
+        formatResponse(false, null, "Neplatný typ objektu", {
           type: "VALIDATION_ERROR",
           field: "targetType",
           allowedValues: Object.values(REPORT_TARGET_TYPES),
@@ -48,7 +48,7 @@ class ReportController {
     // Валидация reason
     if (!reason || !Object.values(REPORT_REASONS).includes(reason)) {
       return res.status(400).json(
-        formatResponse(false, null, "Недопустимая причина жалобы", {
+        formatResponse(false, null, "Neplatný dôvod sťažnosti", {
           type: "VALIDATION_ERROR",
           field: "reason",
           allowedValues: Object.values(REPORT_REASONS),
@@ -59,15 +59,10 @@ class ReportController {
     // Валидация description (опционально)
     if (description && description.length > 1000) {
       return res.status(400).json(
-        formatResponse(
-          false,
-          null,
-          "Описание не может превышать 1000 символов",
-          {
-            type: "VALIDATION_ERROR",
-            field: "description",
-          }
-        )
+        formatResponse(false, null, "Popis nesmie presiahnuť 1000 znakov", {
+          type: "VALIDATION_ERROR",
+          field: "description",
+        })
       );
     }
 
@@ -79,7 +74,7 @@ class ReportController {
     );
     if (existingReport) {
       return res.status(409).json(
-        formatResponse(false, null, "Вы уже подавали жалобу на этот объект", {
+        formatResponse(false, null, "Už ste podali sťažnosť na tento objekt", {
           type: "DUPLICATE_REPORT",
         })
       );
@@ -125,7 +120,9 @@ class ReportController {
 
     res
       .status(201)
-      .json(formatResponse(true, populatedReport, "Жалоба успешно подана"));
+      .json(
+        formatResponse(true, populatedReport, "Sťažnosť bola úspešne podaná")
+      );
   });
 
   // Получение жалоб пользователя
@@ -147,7 +144,9 @@ class ReportController {
       limit
     );
 
-    res.json(formatResponse(true, paginatedResponse, "Мои жалобы получены"));
+    res.json(
+      formatResponse(true, paginatedResponse, "Moje sťažnosti boli získané")
+    );
   });
 
   // Получение всех жалоб (только админы)
@@ -184,7 +183,9 @@ class ReportController {
       limit
     );
 
-    res.json(formatResponse(true, paginatedResponse, "Все жалобы получены"));
+    res.json(
+      formatResponse(true, paginatedResponse, "Všetky sťažnosti boli získané")
+    );
   });
 
   // Получение жалоб в ожидании (только админы)
@@ -206,7 +207,7 @@ class ReportController {
     );
 
     res.json(
-      formatResponse(true, paginatedResponse, "Жалобы в ожидании получены")
+      formatResponse(true, paginatedResponse, "Čakajúce sťažnosti boli získané")
     );
   });
 
@@ -217,7 +218,7 @@ class ReportController {
     // Валидация targetId
     if (!isValidObjectId(targetId)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID объекта", {
+        formatResponse(false, null, "Neplatný formát ID objektu", {
           type: "VALIDATION_ERROR",
           field: "targetId",
         })
@@ -227,7 +228,7 @@ class ReportController {
     // Валидация targetType
     if (!Object.values(REPORT_TARGET_TYPES).includes(targetType)) {
       return res.status(400).json(
-        formatResponse(false, null, "Недопустимый тип объекта", {
+        formatResponse(false, null, "Neplatný typ objektu", {
           type: "VALIDATION_ERROR",
           field: "targetType",
           allowedValues: Object.values(REPORT_TARGET_TYPES),
@@ -237,7 +238,7 @@ class ReportController {
 
     const reports = await Report.findByTarget(targetId, targetType);
 
-    res.json(formatResponse(true, reports, "Жалобы на объект получены"));
+    res.json(formatResponse(true, reports, "Sťažnosti na objekt boli získané"));
   });
 
   // Рассмотрение жалобы (только админы)
@@ -249,7 +250,7 @@ class ReportController {
     // Валидация ID
     if (!isValidObjectId(id)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID жалобы", {
+        formatResponse(false, null, "Neplatný formát ID sťažnosti", {
           type: "VALIDATION_ERROR",
           field: "id",
         })
@@ -260,12 +261,12 @@ class ReportController {
     if (!report) {
       return res
         .status(404)
-        .json(formatResponse(false, null, "Жалоба не найдена"));
+        .json(formatResponse(false, null, "Sťažnosť nebola nájdená"));
     }
 
     if (report.status !== REPORT_STATUS.PENDING) {
       return res.status(400).json(
-        formatResponse(false, null, "Жалоба уже рассмотрена", {
+        formatResponse(false, null, "Sťažnosť už bola posúdená", {
           type: "REPORT_ALREADY_REVIEWED",
         })
       );
@@ -281,7 +282,11 @@ class ReportController {
     );
 
     res.json(
-      formatResponse(true, reviewedReport, "Жалоба отмечена как рассмотренная")
+      formatResponse(
+        true,
+        reviewedReport,
+        "Sťažnosť bola označená ako posúdená"
+      )
     );
   });
 
@@ -294,7 +299,7 @@ class ReportController {
     // Валидация ID
     if (!isValidObjectId(id)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID жалобы", {
+        formatResponse(false, null, "Neplatný formát ID sťažnosti", {
           type: "VALIDATION_ERROR",
           field: "id",
         })
@@ -307,7 +312,7 @@ class ReportController {
         formatResponse(
           false,
           null,
-          "Описание принятых мер должно содержать минимум 5 символов",
+          "Popis prijatých opatrení musí obsahovať aspoň 5 znakov",
           {
             type: "VALIDATION_ERROR",
             field: "actionTaken",
@@ -320,7 +325,7 @@ class ReportController {
     if (!report) {
       return res
         .status(404)
-        .json(formatResponse(false, null, "Жалоба не найдена"));
+        .json(formatResponse(false, null, "Sťažnosť nebola nájdená"));
     }
 
     // Разрешаем жалобу
@@ -336,7 +341,9 @@ class ReportController {
       `Resolved report ${id} with action: ${actionTaken.trim()}`
     );
 
-    res.json(formatResponse(true, resolvedReport, "Жалоба успешно разрешена"));
+    res.json(
+      formatResponse(true, resolvedReport, "Sťažnosť bola úspešne vyriešená")
+    );
   });
 
   // Получение статистики жалоб (только админы)
@@ -354,7 +361,9 @@ class ReportController {
         : 0,
     };
 
-    res.json(formatResponse(true, fullStatistics, "Статистика жалоб получена"));
+    res.json(
+      formatResponse(true, fullStatistics, "Štatistika sťažností bola získaná")
+    );
   });
 
   // Получение действий конкретного админа по жалобам
@@ -365,7 +374,7 @@ class ReportController {
     // Валидация adminId
     if (!isValidObjectId(adminId)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID администратора", {
+        formatResponse(false, null, "Neplatný formát ID administrátora", {
           type: "VALIDATION_ERROR",
           field: "adminId",
         })
@@ -376,7 +385,7 @@ class ReportController {
     if (adminId !== req.user._id.toString() && req.user.role !== "admin") {
       return res
         .status(403)
-        .json(formatResponse(false, null, "Недостаточно прав доступа"));
+        .json(formatResponse(false, null, "Nedostatočné oprávnenia"));
     }
 
     const [reports, total] = await Promise.all([
@@ -397,7 +406,7 @@ class ReportController {
       formatResponse(
         true,
         paginatedResponse,
-        "Действия администратора по жалобам получены"
+        "Akcie administrátora k sťažnostiam boli získané"
       )
     );
   });

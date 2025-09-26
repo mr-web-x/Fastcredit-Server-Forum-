@@ -27,7 +27,7 @@ class SpamDetectionService {
           Model = Comment;
           break;
         default:
-          throw new Error("Invalid content type");
+          throw new Error("Neplatný typ obsahu");
       }
 
       const query = {};
@@ -102,7 +102,7 @@ class SpamDetectionService {
     try {
       const user = await User.findById(userId);
       if (!user) {
-        throw new Error("User not found");
+        throw new Error("Používateľ nebol nájdený");
       }
 
       let suspicionScore = 0;
@@ -361,7 +361,7 @@ class SpamDetectionService {
           Model = Comment;
           break;
         default:
-          throw new Error("Invalid content type");
+          throw new Error("Neplatný typ obsahu");
       }
 
       await Model.findByIdAndUpdate(contentId, {
@@ -373,7 +373,7 @@ class SpamDetectionService {
       if (isSpam) {
         logSecurityEvent(
           "CONTENT_MARKED_AS_SPAM",
-          `${contentType} ${contentId} marked as spam by admin`,
+          `${contentType} ${contentId} označený ako spam administrátorom`,
           null,
           null
         );

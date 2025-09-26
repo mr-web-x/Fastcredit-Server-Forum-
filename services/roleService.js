@@ -15,20 +15,20 @@ class RoleService {
     try {
       // Валидация новой роли
       if (!Object.values(USER_ROLES).includes(newRole)) {
-        throw new Error(`Invalid role: ${newRole}`);
+        throw new Error(`Neplatná rola: ${newRole}`);
       }
 
       // Получаем пользователя
       const user = await User.findById(userId);
       if (!user) {
-        throw new Error("User not found");
+        throw new Error("Používateľ nebol nájdený");
       }
 
       const oldRole = user.role;
 
       // Проверяем, что роль действительно изменяется
       if (oldRole === newRole) {
-        throw new Error("User already has this role");
+        throw new Error("Používateľ už má túto rolu");
       }
 
       // Обновляем роль пользователя
@@ -273,16 +273,16 @@ class RoleService {
       ]);
 
       if (!targetUser) {
-        return { canChange: false, reason: "Target user not found" };
+        return { canChange: false, reason: "Cieľový používateľ nebol nájdený" };
       }
 
       if (!admin || admin.role !== USER_ROLES.ADMIN) {
-        return { canChange: false, reason: "Only admins can change roles" };
+        return { canChange: false, reason: "Iba administrátori môžu meniť roly" };
       }
 
       // Нельзя изменить свою собственную роль
       if (targetUserId === adminId) {
-        return { canChange: false, reason: "Cannot change your own role" };
+        return { canChange: false, reason: "Nemôžete zmeniť svoju vlastnú rolu" };
       }
 
       // Нельзя назначить роль выше своей
@@ -298,14 +298,14 @@ class RoleService {
       if (targetLevel > adminLevel) {
         return {
           canChange: false,
-          reason: "Cannot assign role higher than your own",
+          reason: "Nemôžete priradiť rolu vyššiu ako je vaša vlastná",
         };
       }
 
       return { canChange: true };
     } catch (error) {
       logError(error, "RoleService.canChangeRole");
-      return { canChange: false, reason: "Internal error" };
+      return { canChange: false, reason: "Interná chyba" };
     }
   }
 

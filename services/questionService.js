@@ -72,7 +72,7 @@ class QuestionService {
       );
 
       if (!question) {
-        throw new Error("Question not found");
+        throw new Error("Otázka nebola nájdená");
       }
 
       await cryptoService.smartDecrypt(question);
@@ -345,7 +345,7 @@ class QuestionService {
       const question = await Question.findById(questionId);
 
       if (!question) {
-        throw new Error("Question not found");
+        throw new Error("Otázka nebola nájdená");
       }
 
       // Проверяем права (автор или админ)
@@ -355,7 +355,7 @@ class QuestionService {
         user.role === "admin";
 
       if (!canEdit) {
-        throw new Error("No permission to edit this question");
+        throw new Error("Nemáte oprávnenie upravovať túto otázku");
       }
 
       // Обновляем вопрос
@@ -393,7 +393,7 @@ class QuestionService {
       const question = await Question.findById(questionId);
 
       if (!question) {
-        throw new Error("Question not found");
+        throw new Error("Otázka nebola nájdená");
       }
 
       // Проверяем права (автор или админ)
@@ -403,7 +403,7 @@ class QuestionService {
         user.role === "admin";
 
       if (!canDelete) {
-        throw new Error("No permission to delete this question");
+        throw new Error("Nemáte oprávnenie odstrániť túto otázku");
       }
 
       // Удаляем связанные данные
@@ -441,7 +441,7 @@ class QuestionService {
       const skip = (page - 1) * limit;
 
       if (!searchQuery || searchQuery.trim().length < 2) {
-        throw new Error("Search query must be at least 2 characters long");
+        throw new Error("Vyhľadávací dopyt musí mať aspoň 2 znaky");
       }
 
       const query = {
@@ -473,7 +473,7 @@ class QuestionService {
     try {
       const question = await Question.findById(questionId);
       if (!question) {
-        throw new Error("Question not found");
+        throw new Error("Otázka nebola nájdená");
       }
 
       // Проверяем существующий лайк
@@ -519,7 +519,7 @@ class QuestionService {
     try {
       const question = await Question.findById(questionId);
       if (!question) {
-        throw new Error("Question not found");
+        throw new Error("Otázka nebola nájdená");
       }
 
       // Поиск по категории и ключевым словам из заголовка
@@ -558,7 +558,7 @@ class QuestionService {
     try {
       const question = await Question.findById(questionId);
       if (!question) {
-        throw new Error("Question not found");
+        throw new Error("Otázka nebola nájdená");
       }
 
       const oldStatus = question.status;

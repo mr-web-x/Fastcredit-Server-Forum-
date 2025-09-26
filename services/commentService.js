@@ -15,19 +15,19 @@ class CommentService {
       // Проверяем существование вопроса
       const question = await Question.findById(questionId);
       if (!question) {
-        throw new Error("Question not found");
+        throw new Error("Otázka nebola nájdená");
       }
 
       // Проверяем существование родительского комментария (если указан)
       if (parentComment) {
         const parent = await Comment.findById(parentComment);
         if (!parent) {
-          throw new Error("Parent comment not found");
+          throw new Error("Rodičovský komentár nebol nájdený");
         }
 
         // Проверяем, что родительский комментарий относится к тому же вопросу
         if (parent.questionId.toString() !== questionId.toString()) {
-          throw new Error("Parent comment does not belong to this question");
+          throw new Error("Rodičovský komentár nepatrí k tejto otázke");
         }
       }
 
@@ -146,7 +146,7 @@ class CommentService {
       const comment = await Comment.findById(commentId);
 
       if (!comment) {
-        throw new Error("Comment not found");
+        throw new Error("Komentár nebol nájdený");
       }
 
       // Проверяем права (автор комментария или админ)
@@ -156,7 +156,7 @@ class CommentService {
         user.role === "admin";
 
       if (!canEdit) {
-        throw new Error("No permission to edit this comment");
+        throw new Error("Nemáte oprávnenie upraviť tento komentár");
       }
 
       // Проверяем время редактирования (можно редактировать только в течение 10 минут)
@@ -165,13 +165,13 @@ class CommentService {
 
       if (!canEditTime && user.role !== "admin") {
         throw new Error(
-          "Comment can only be edited within 10 minutes of creation"
+          "Komentár je možné upraviť iba do 10 minút od vytvorenia"
         );
       }
 
       const { content } = updateData;
       if (!content) {
-        throw new Error("Content is required");
+        throw new Error("Obsah je povinný");
       }
 
       comment.content = content;
@@ -199,7 +199,7 @@ class CommentService {
       const comment = await Comment.findById(commentId);
 
       if (!comment) {
-        throw new Error("Comment not found");
+        throw new Error("Komentár nebol nájdený");
       }
 
       // Проверяем права (автор комментария или админ)
@@ -209,7 +209,7 @@ class CommentService {
         user.role === "admin";
 
       if (!canDelete) {
-        throw new Error("No permission to delete this comment");
+        throw new Error("Nemáte oprávnenie odstrániť tento komentár");
       }
 
       // Удаляем комментарий (это также удалит все ответы на него через pre-remove middleware)
@@ -230,13 +230,13 @@ class CommentService {
       const comment = await Comment.findById(commentId);
 
       if (!comment) {
-        throw new Error("Comment not found");
+        throw new Error("Komentár nebol nájdený");
       }
 
       // Проверяем права модератора
       const moderator = await User.findById(moderatorId);
       if (!moderator || !moderator.canModerate) {
-        throw new Error("Only moderators can moderate comments");
+        throw new Error("Iba moderátori môžu moderovať komentáre");
       }
 
       await comment.moderate(moderatorId, isApproved);

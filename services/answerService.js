@@ -17,12 +17,12 @@ class AnswerService {
       // Проверяем существование вопроса
       const question = await Question.findById(questionId);
       if (!question) {
-        throw new Error("Question not found");
+        throw new Error("Otázka nebola nájdená");
       }
 
       // Проверяем, что эксперт не отвечает на свой вопрос
       if (question.author.toString() === expertId.toString()) {
-        throw new Error("Cannot answer your own question");
+        throw new Error("Nemôžete odpovedať na vlastnú otázku");
       }
 
       const existingAnswer = await Answer.findOne({
@@ -31,13 +31,13 @@ class AnswerService {
       });
 
       if (existingAnswer) {
-        throw new Error("You have already answered this question");
+        throw new Error("Už ste odpovedali na túto otázku");
       }
 
       // Проверяем права эксперта
       const expert = await User.findById(expertId);
       if (!expert.isExpert()) {
-        throw new Error("Only experts can answer questions");
+        throw new Error("Iba experti môžu odpovedať na otázky");
       }
 
       // Создаем ответ (по умолчанию требует модерации)
@@ -143,7 +143,7 @@ class AnswerService {
         .populate("expert");
 
       if (!answer) {
-        throw new Error("Answer not found");
+        throw new Error("Odpoveď nebola nájdená");
       }
 
       await cryptoService.smartDecrypt(answer);
@@ -151,7 +151,7 @@ class AnswerService {
       // Проверяем права модератора
       const moderator = await User.findById(moderatorId);
       if (!moderator || !moderator.canModerate) {
-        throw new Error("Only moderators can moderate answers");
+        throw new Error("Iba moderátori môžu moderovať odpovede");
       }
 
       await cryptoService.smartDecrypt(moderator);
@@ -256,20 +256,20 @@ class AnswerService {
         .populate("expert");
 
       if (!answer) {
-        throw new Error("Answer not found");
+        throw new Error("Odpoveď nebola nájdená");
       }
 
       if (!answer.isApproved) {
-        throw new Error("Cannot accept unapproved answer");
+        throw new Error("Nie je možné prijať neodobrenú odpoveď");
       }
 
       // Проверяем, что пользователь - автор вопроса
       if (answer.questionId.author.toString() !== userId.toString()) {
-        throw new Error("Only question author can accept answers");
+        throw new Error("Iba autor otázky môže prijať odpoveď");
       }
 
       if (answer.questionId.hasAcceptedAnswer) {
-        throw new Error("Question already has accepted answer");
+        throw new Error("Otázka už má prijatú odpoveď");
       }
 
       // Принимаем ответ
@@ -313,12 +313,12 @@ class AnswerService {
       const answer = await Answer.findById(answerId);
 
       if (!answer) {
-        throw new Error("Answer not found");
+        throw new Error("Odpoveď nebola nájdená");
       }
 
       const user = await User.findById(userId);
       if (!user) {
-        throw new Error("User not found");
+        throw new Error("Používateľ nebol nájdený");
       }
 
       // Проверяем права (автор ответа или админ)
@@ -326,20 +326,20 @@ class AnswerService {
         answer.expert.toString() === userId.toString() || user.role === "admin";
 
       if (!canEdit) {
-        throw new Error("No permission to edit this answer");
+        throw new Error("Nemáte oprávnenie upraviť túto odpoveď");
       }
 
       const { content } = updateData;
       if (!content || content.trim().length === 0) {
-        throw new Error("Content is required");
+        throw new Error("Obsah je povinný");
       }
 
       if (content.trim().length < 50) {
-        throw new Error("Answer must be at least 50 characters long");
+        throw new Error("Odpoveď musí mať aspoň 50 znakov");
       }
 
       if (content.trim().length > 5000) {
-        throw new Error("Answer cannot exceed 5000 characters");
+        throw new Error("Odpoveď nemôže presiahnuť 5000 znakov");
       }
 
       const question = await Question.findById(answer.questionId);
@@ -441,7 +441,7 @@ class AnswerService {
       const answer = await Answer.findById(answerId).populate("questionId");
 
       if (!answer) {
-        throw new Error("Answer not found");
+        throw new Error("Odpoveď nebola nájdená");
       }
 
       // Проверяем права (автор ответа или админ)
@@ -450,11 +450,11 @@ class AnswerService {
         answer.expert.toString() === userId.toString() || user.role === "admin";
 
       if (!canDelete) {
-        throw new Error("No permission to delete this answer");
+        throw new Error("Nemáte oprávnenie odstrániť túto odpoveď");
       }
 
       if (answer.wasApproved && user.role !== "admin") {
-        throw new Error("Cannot delete answer that was previously approved");
+        throw new Error("Nie je možné odstrániť odpoveď, ktorá bola predtým schválená");
       }
 
       // Удаляем социальные посты если они есть

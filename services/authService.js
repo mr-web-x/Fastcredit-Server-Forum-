@@ -33,7 +33,7 @@ class AuthService {
         payload.iss !== "accounts.google.com" &&
         payload.iss !== "https://accounts.google.com"
       ) {
-        throw new Error("INVALID_ISSUER");
+        throw new Error("NEPLATNY_VYDAVATEL");
       }
 
       const normalized = {
@@ -54,12 +54,12 @@ class AuthService {
         return { type: "jwt", data: decoded };
       } catch (jwtError) {
         if (jwtError.name === "TokenExpiredError") {
-          throw new Error("TOKEN_EXPIRED");
+          throw new Error("TOKEN_VYPRŠAL");
         }
         if (jwtError.name === "JsonWebTokenError") {
-          throw new Error("INVALID_TOKEN");
+          throw new Error("NEPLATNY_TOKEN");
         }
-        throw new Error("INVALID_TOKEN");
+        throw new Error("NEPLATNY_TOKEN");
       }
     }
   }
@@ -85,7 +85,7 @@ class AuthService {
           });
 
           if (existingUser) {
-            throw new Error("EMAIL_ALREADY_EXISTS");
+            throw new Error("EMAIL_UZ_EXISTUJE");
           }
 
           // Создаем нового Google пользователя
@@ -122,13 +122,13 @@ class AuthService {
         );
 
         if (!user) {
-          throw new Error("USER_NOT_FOUND");
+          throw new Error("POUZIVATEL_NENAJDENY");
         }
 
         return user;
       }
 
-      throw new Error("INVALID_TOKEN_TYPE");
+      throw new Error("NEPLATNY_TYP_TOKENU");
     } catch (error) {
       logError(error, "AuthService.getUserFromToken");
       throw error;
@@ -142,8 +142,8 @@ class AuthService {
       if (!user.isActive) {
         return {
           valid: false,
-          reason: "ACCOUNT_INACTIVE",
-          message: "Аккаунт деактивирован",
+          reason: "UCET_NEAKTIVNY",
+          message: "Účet je deaktivovaný",
         };
       }
 
@@ -154,8 +154,8 @@ class AuthService {
         );
         return {
           valid: false,
-          reason: "ACCOUNT_LOCKED",
-          message: `Аккаунт заблокирован на ${lockTimeLeft} минут`,
+          reason: "UCET_ZAMKNUTY",
+          message: `Účet je zamknutý na ${lockTimeLeft} minút`,
           lockUntil: user.lockUntil,
         };
       }
@@ -170,10 +170,10 @@ class AuthService {
 
         return {
           valid: false,
-          reason: "USER_BANNED",
+          reason: "POUZIVATEL_ZABLOKOVANY",
           message: user.bannedUntil
-            ? `Пользователь забанен до ${user.bannedUntil.toLocaleString()}`
-            : "Пользователь забанен навсегда",
+            ? `Používateľ je zablokovaný do ${user.bannedUntil.toLocaleString()}`
+            : "Používateľ je zablokovaný natrvalo",
           banInfo,
         };
       }
@@ -183,8 +183,8 @@ class AuthService {
       logError(error, "AuthService.validateUserStatus");
       return {
         valid: false,
-        reason: "VALIDATION_ERROR",
-        message: "Ошибка проверки статуса пользователя",
+        reason: "CHYBA_VALIDACIE",
+        message: "Chyba pri overovaní stavu používateľa",
       };
     }
   }
@@ -209,7 +209,7 @@ class AuthService {
       });
     } catch (error) {
       logError(error, "AuthService.generateInternalToken");
-      throw new Error("Ошибка генерации токена");
+      throw new Error("Chyba generovania tokenu");
     }
   }
 
@@ -220,7 +220,7 @@ class AuthService {
       await cryptoService.smartDecrypt(user);
 
       if (!user) {
-        throw new Error("USER_NOT_FOUND");
+        throw new Error("POUZIVATEL_NENAJDENY");
       }
 
       return {
@@ -262,14 +262,14 @@ class AuthService {
       // Проверяем существование пользователя с таким email
       const existingEmailUser = await User.findOne({ email: hashedEmail });
       if (existingEmailUser) {
-        throw new Error("EMAIL_EXISTS");
+        throw new Error("EMAIL_EXISTUJE");
       }
 
       // Проверяем существование пользователя с таким username (если указан)
       if (username) {
         const existingUsernameUser = await User.findOne({ username });
         if (existingUsernameUser) {
-          throw new Error("USERNAME_EXISTS");
+          throw new Error("UZIVATELSKE_MENO_EXISTUJE");
         }
       }
 
@@ -309,7 +309,7 @@ class AuthService {
       return {
         user,
         verificationSent: verificationResult?.success || false,
-        message: "Пользователь создан. Проверьте email для подтверждения.",
+        message: "Používateľ bol vytvorený. Skontrolujte email na potvrdenie.",
         ...(verificationResult?.devCode && {
           devCode: verificationResult.devCode,
         }),
@@ -317,19 +317,19 @@ class AuthService {
     } catch (error) {
       logError(error, "AuthService.registerUser");
 
-      if (error.message === "EMAIL_EXISTS") {
-        throw new Error("Пользователь с таким email уже существует");
+      if (error.message === "EMAIL_EXISTUJE") {
+        throw new Error("Používateľ s týmto emailom už existuje");
       }
-      if (error.message === "USERNAME_EXISTS") {
-        throw new Error("Пользователь с таким username уже существует");
+      if (error.message === "UZIVATELSKE_MENO_EXISTUJE") {
+        throw new Error("Používateľ s týmto užívateľským menom už existuje");
       }
       if (error.code === 11000) {
         // MongoDB duplicate key error
         if (error.keyPattern?.email) {
-          throw new Error("Email уже занят");
+          throw new Error("Email je už obsadený");
         }
         if (error.keyPattern?.username) {
-          throw new Error("Username уже занят");
+          throw new Error("Užívateľské meno je už obsadené");
         }
       }
 
@@ -341,7 +341,7 @@ class AuthService {
   async loginUser({ login, password }) {
     try {
       if (!login || !password) {
-        throw new Error("LOGIN_PASSWORD_REQUIRED");
+        throw new Error("PRIHLASOVACIE_UDAJE_POVINNE");
       }
 
       // Ищем пользователя по email или username с паролем
@@ -353,7 +353,7 @@ class AuthService {
           `Login attempt with non-existent user: ${login}`,
           null
         );
-        throw new Error("INVALID_CREDENTIALS");
+        throw new Error("NEPLATNE_UDAJE");
       }
 
       // Проверяем блокировку аккаунта
@@ -368,7 +368,7 @@ class AuthService {
           user._id,
           lockTimeLeft
         );
-        throw new Error("ACCOUNT_LOCKED");
+        throw new Error("UCET_ZAMKNUTY");
       }
 
       // Проверяем пароль с помощью security.js
@@ -383,7 +383,7 @@ class AuthService {
           `Invalid password for user: ${user.email}`,
           user._id
         );
-        throw new Error("INVALID_CREDENTIALS");
+        throw new Error("NEPLATNE_UDAJE");
       }
 
       // Сбрасываем счетчик попыток при успешном входе
@@ -410,15 +410,15 @@ class AuthService {
     } catch (error) {
       logError(error, "AuthService.loginUser");
 
-      if (error.message === "LOGIN_PASSWORD_REQUIRED") {
-        throw new Error("Логин и пароль обязательны");
+      if (error.message === "PRIHLASOVACIE_UDAJE_POVINNE") {
+        throw new Error("Prihlasovacie meno a heslo sú povinné");
       }
-      if (error.message === "INVALID_CREDENTIALS") {
-        throw new Error("Неверный email/логин или пароль");
+      if (error.message === "NEPLATNE_UDAJE") {
+        throw new Error("Nesprávny email/meno alebo heslo");
       }
-      if (error.message === "ACCOUNT_LOCKED") {
+      if (error.message === "UCET_ZAMKNUTY") {
         throw new Error(
-          "Аккаунт временно заблокирован из-за множественных неудачных попыток входа"
+          "Účet je dočasne zamknutý kvôli viacerým neúspešným pokusom o prihlásenie"
         );
       }
 
@@ -509,7 +509,7 @@ class AuthService {
       const existingUser = await User.findOne({ email: hashedEmail });
       return {
         available: !existingUser,
-        message: existingUser ? "Email уже занят" : "Email доступен",
+        message: existingUser ? "Email je už obsadený" : "Email je dostupný",
       };
     } catch (error) {
       logError(error, "AuthService.checkEmailAvailability");
@@ -523,7 +523,7 @@ class AuthService {
       const existingUser = await User.findOne({ username });
       return {
         available: !existingUser,
-        message: existingUser ? "Username уже занят" : "Username доступен",
+        message: existingUser ? "Užívateľské meno je už obsadené" : "Užívateľské meno je dostupné",
       };
     } catch (error) {
       logError(error, "AuthService.checkUsernameAvailability");
@@ -537,7 +537,7 @@ class AuthService {
       const user = await User.findById(userId);
 
       if (!user) {
-        throw new Error("USER_NOT_FOUND");
+        throw new Error("POUZIVATEL_NENAJDENY");
       }
 
       // Разрешенные поля для обновления
@@ -558,7 +558,7 @@ class AuthService {
         });
 
         if (existingUser) {
-          throw new Error("USERNAME_EXISTS");
+          throw new Error("UZIVATELSKE_MENO_EXISTUJE");
         }
       }
 
@@ -577,11 +577,11 @@ class AuthService {
     } catch (error) {
       logError(error, "AuthService.updateUserProfile");
 
-      if (error.message === "USER_NOT_FOUND") {
-        throw new Error("Пользователь не найден");
+      if (error.message === "POUZIVATEL_NENAJDENY") {
+        throw new Error("Používateľ nebol nájdený");
       }
-      if (error.message === "USERNAME_EXISTS") {
-        throw new Error("Username уже занят");
+      if (error.message === "UZIVATELSKE_MENO_EXISTUJE") {
+        throw new Error("Užívateľské meno je už obsadené");
       }
 
       throw error;

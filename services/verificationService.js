@@ -21,15 +21,15 @@ class VerificationService {
       });
 
       if (!user) {
-        throw new Error("USER_NOT_FOUND");
+        throw new Error("POUŽÍVATEĽ_NENÁJDENÝ");
       }
 
       // Если email уже подтвержден
       if (user.isEmailVerified) {
         return {
           success: false,
-          error: "EMAIL_ALREADY_VERIFIED",
-          message: "Email уже подтвержден",
+          error: "EMAIL_UŽ_OVERENÝ",
+          message: "Email už bol overený",
         };
       }
 
@@ -43,8 +43,8 @@ class VerificationService {
         const timeLeft = Math.ceil(existingCode.timeUntilExpiry / 1000 / 60);
         return {
           success: false,
-          error: "CODE_ALREADY_SENT",
-          message: `Код уже отправлен. Повторная отправка возможна через ${timeLeft} мин.`,
+          error: "KÓD_UŽ_ODOSLANÝ",
+          message: `Kód už bol odoslaný. Opätovné odoslanie je možné o ${timeLeft} min.`,
           timeUntilExpiry: existingCode.timeUntilExpiry,
         };
       }
@@ -75,9 +75,8 @@ class VerificationService {
 
       return {
         success: true,
-        message: "Код подтверждения отправлен на email",
+        message: "Overovací kód bol odoslaný na email",
         expiresAt: verificationCode.expiresAt,
-        // В development можно возвращать код для тестирования
         ...(process.env.NODE_ENV === "development" && {
           devCode: verificationCode.code,
         }),
@@ -85,8 +84,8 @@ class VerificationService {
     } catch (error) {
       logError(error, "VerificationService.sendEmailVerificationCode");
 
-      if (error.message === "USER_NOT_FOUND") {
-        throw new Error("Пользователь с таким email не найден");
+      if (error.message === "POUŽÍVATEĽ_NENÁJDENÝ") {
+        throw new Error("Používateľ s týmto emailom nebol nájdený");
       }
 
       throw error;
@@ -111,14 +110,14 @@ class VerificationService {
           null,
           requestIP
         );
-        throw new Error("USER_NOT_FOUND");
+        throw new Error("POUŽÍVATEĽ_NENÁJDENÝ");
       }
 
       // Если email уже подтвержден
       if (user.isEmailVerified) {
         return {
           success: true,
-          message: "Email уже подтвержден",
+          message: "Email už bol overený",
           alreadyVerified: true,
         };
       }
@@ -138,6 +137,7 @@ class VerificationService {
           requestIP
         );
 
+        verificationResult.message = "Neplatný alebo expirovaný kód";
         return verificationResult;
       }
 
@@ -154,7 +154,7 @@ class VerificationService {
 
       return {
         success: true,
-        message: "Email успешно подтвержден",
+        message: "Email bol úspešne overený",
         user: {
           id: user._id,
           email: user.email,
@@ -164,8 +164,8 @@ class VerificationService {
     } catch (error) {
       logError(error, "VerificationService.verifyEmailCode");
 
-      if (error.message === "USER_NOT_FOUND") {
-        throw new Error("Пользователь не найден");
+      if (error.message === "POUŽÍVATEĽ_NENÁJDENÝ") {
+        throw new Error("Používateľ nebol nájdený");
       }
 
       throw error;
@@ -194,7 +194,7 @@ class VerificationService {
         return {
           success: true,
           message:
-            "Если пользователь с таким email существует, код отправлен на почту",
+            "Ak používateľ s týmto emailom existuje, kód bol odoslaný na email",
         };
       }
 
@@ -216,8 +216,8 @@ class VerificationService {
 
         return {
           success: false,
-          error: "CODE_ALREADY_SENT",
-          message: `Код уже отправлен. Повторная отправка возможна через ${timeLeft} мин.`,
+          error: "KÓD_UŽ_ODOSLANÝ",
+          message: `Kód už bol odoslaný. Opätovné odoslanie je možné o ${timeLeft} min.`,
           timeUntilExpiry: existingCode.timeUntilExpiry,
         };
       }
@@ -253,9 +253,8 @@ class VerificationService {
 
       return {
         success: true,
-        message: "Код для сброса пароля отправлен на email",
+        message: "Kód na obnovenie hesla bol odoslaný na email",
         expiresAt: verificationCode.expiresAt,
-        // В development можно возвращать код для тестирования
         ...(process.env.NODE_ENV === "development" && {
           devCode: verificationCode.code,
         }),
@@ -284,7 +283,7 @@ class VerificationService {
           null,
           requestIP
         );
-        throw new Error("USER_NOT_FOUND");
+        throw new Error("POUŽÍVATEĽ_NENÁJDENÝ");
       }
 
       // Проверяем код
@@ -302,6 +301,7 @@ class VerificationService {
           requestIP
         );
 
+        verificationResult.message = "Neplatný alebo expirovaný kód";
         return verificationResult;
       }
 
@@ -313,8 +313,8 @@ class VerificationService {
 
       return {
         success: true,
-        message: "Код подтвержден. Теперь можно установить новый пароль",
-        resetToken: verificationResult.verificationCode._id.toString(), // Используем ID кода как токен
+        message: "Kód bol overený. Teraz môžete nastaviť nové heslo",
+        resetToken: verificationResult.verificationCode._id.toString(),
         user: {
           id: user._id,
           email: user.email,
@@ -323,8 +323,8 @@ class VerificationService {
     } catch (error) {
       logError(error, "VerificationService.verifyPasswordResetCode");
 
-      if (error.message === "USER_NOT_FOUND") {
-        throw new Error("Пользователь не найден");
+      if (error.message === "POUŽÍVATEĽ_NENÁJDENÝ") {
+        throw new Error("Používateľ nebol nájdený");
       }
 
       throw error;
@@ -343,7 +343,7 @@ class VerificationService {
       });
 
       if (!user) {
-        throw new Error("USER_NOT_FOUND");
+        throw new Error("POUŽÍVATEĽ_NENÁJDENÝ");
       }
 
       // Проверяем код (он должен быть использован, но еще действительный)
@@ -351,8 +351,8 @@ class VerificationService {
         email: hashedEmail,
         code: code.toString(),
         type: "password_reset",
-        isUsed: true, // Код должен быть уже проверен в verifyPasswordResetCode
-        usedAt: { $gt: new Date(Date.now() - 5 * 60 * 1000) }, // Использован не более 5 минут назад
+        isUsed: true,
+        usedAt: { $gt: new Date(Date.now() - 5 * 60 * 1000) },
       });
 
       if (!verificationCode) {
@@ -365,8 +365,8 @@ class VerificationService {
 
         return {
           success: false,
-          error: "INVALID_OR_EXPIRED_CODE",
-          message: "Недействительный или истекший код. Запросите новый код.",
+          error: "NEPLATNÝ_ALEBO_EXPIROVANÝ_KÓD",
+          message: "Neplatný alebo expirovaný kód. Požiadajte o nový kód.",
         };
       }
 
@@ -393,7 +393,7 @@ class VerificationService {
 
       return {
         success: true,
-        message: "Пароль успешно изменен",
+        message: "Heslo bolo úspešne zmenené",
         user: {
           id: user._id,
           email: user.email,
@@ -402,8 +402,8 @@ class VerificationService {
     } catch (error) {
       logError(error, "VerificationService.resetPasswordWithCode");
 
-      if (error.message === "USER_NOT_FOUND") {
-        throw new Error("Пользователь не найден");
+      if (error.message === "POUŽÍVATEĽ_NENÁJDENÝ") {
+        throw new Error("Používateľ nebol nájdený");
       }
 
       throw error;
@@ -423,7 +423,7 @@ class VerificationService {
       if (!activeCode) {
         return {
           hasActiveCode: false,
-          message: "Активный код не найден",
+          message: "Aktívny kód nebol nájdený",
         };
       }
 
@@ -465,8 +465,8 @@ class VerificationService {
         cancelled: result.deletedCount > 0,
         message:
           result.deletedCount > 0
-            ? "Активный код отменен"
-            : "Активный код не найден",
+            ? "Aktívny kód bol zrušený"
+            : "Aktívny kód nebol nájdený",
       };
     } catch (error) {
       logError(error, "VerificationService.cancelActiveCode");
@@ -485,7 +485,7 @@ class VerificationService {
         email,
         history: history.map((code) => ({
           type: code.type,
-          code: code.code.replace(/\d/g, "*"), // Маскируем код для безопасности
+          code: code.code.replace(/\d/g, "*"),
           isUsed: code.isUsed,
           usedAt: code.usedAt,
           attempts: code.attempts,

@@ -152,7 +152,7 @@ export const filterContent = (options = {}) => {
                   formatResponse(
                     false,
                     null,
-                    `Обнаружены недопустимые слова в поле "${field}"`,
+                    `V poli "${field}" boli zistené zakázané slová.`,
                     {
                       type: "CONTENT_BLOCKED",
                       field,
@@ -247,7 +247,7 @@ export const checkContentLength = (options = {}) => {
             formatResponse(
               false,
               null,
-              `Поле "${field}" слишком короткое. Минимум ${limits.min} символов.`,
+              `Pole "${field}" je príliš krátke. Minimálne ${limits.min} znakov.`,
               {
                 type: "CONTENT_TOO_SHORT",
                 field,
@@ -263,7 +263,7 @@ export const checkContentLength = (options = {}) => {
             formatResponse(
               false,
               null,
-              `Поле "${field}" слишком длинное. Максимум ${limits.max} символов.`,
+              `Pole "${field}" je príliš dlhé. Maximálne ${limits.max} znakov.`,
               {
                 type: "CONTENT_TOO_LONG",
                 field,
@@ -301,7 +301,7 @@ export const checkLinks = (options = {}) => {
             formatResponse(
               false,
               null,
-              `Слишком много ссылок в поле "${field}". Максимум ${maxLinks}.`,
+              `Príliš veľa odkazov v poli "${field}". Maximálne ${maxLinks}.`,
               {
                 type: "TOO_MANY_LINKS",
                 field,
@@ -331,7 +331,7 @@ export const checkLinks = (options = {}) => {
               formatResponse(
                 false,
                 null,
-                `Недопустимые ссылки в поле "${field}". Разрешены только ссылки на: ${allowedDomains.join(
+                `Neoprávnené odkazy v poli "${field}". Povolené sú iba odkazy na: ${allowedDomains.join(
                   ", "
                 )}`,
                 {

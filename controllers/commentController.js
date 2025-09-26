@@ -19,7 +19,7 @@ class CommentController {
     // Валидация questionId
     if (!isValidObjectId(questionId)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID вопроса", {
+        formatResponse(false, null, "Nesprávny formát ID otázky", {
           type: "VALIDATION_ERROR",
           field: "questionId",
         })
@@ -40,7 +40,7 @@ class CommentController {
       options
     );
 
-    res.json(formatResponse(true, comments, "Комментарии к вопросу получены"));
+    res.json(formatResponse(true, comments, "Komentáre k otázke boli získané"));
   });
 
   // Создание комментария к вопросу
@@ -52,7 +52,7 @@ class CommentController {
     // Валидация questionId
     if (!isValidObjectId(questionId)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID вопроса", {
+        formatResponse(false, null, "Nesprávny formát ID otázky", {
           type: "VALIDATION_ERROR",
           field: "questionId",
         })
@@ -65,7 +65,7 @@ class CommentController {
         formatResponse(
           false,
           null,
-          "Неверный формат ID родительского комментария",
+          "Nesprávny formát ID rodičovského komentára",
           {
             type: "VALIDATION_ERROR",
             field: "parentComment",
@@ -80,7 +80,7 @@ class CommentController {
         formatResponse(
           false,
           null,
-          "Комментарий должен содержать минимум 5 символов",
+          "Komentár musí obsahovať minimálne 5 znakov",
           {
             type: "VALIDATION_ERROR",
             field: "content",
@@ -94,7 +94,7 @@ class CommentController {
         formatResponse(
           false,
           null,
-          "Комментарий должен содержать максимум 1000 символов",
+          "Komentár môže obsahovať maximálne 1000 znakov",
           {
             type: "VALIDATION_ERROR",
             field: "content",
@@ -116,7 +116,7 @@ class CommentController {
       await notificationService.notifyAboutNewComment(comment._id);
     } catch (notificationError) {
       console.warn(
-        "Failed to send comment notifications:",
+        "Nepodarilo sa odoslať upozornenia na komentár:",
         notificationError.message
       );
     }
@@ -134,7 +134,7 @@ class CommentController {
     // Валидация commentId
     if (!isValidObjectId(commentId)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID комментария", {
+        formatResponse(false, null, "Nesprávny formát ID komentára", {
           type: "VALIDATION_ERROR",
           field: "commentId",
         })
@@ -152,7 +152,9 @@ class CommentController {
 
     const replies = await commentService.getCommentReplies(commentId, options);
 
-    res.json(formatResponse(true, replies, "Ответы на комментарий получены"));
+    res.json(
+      formatResponse(true, replies, "Odpovede na komentár boli získané")
+    );
   });
 
   // Получение комментариев пользователя
@@ -164,7 +166,7 @@ class CommentController {
     // Валидация userId
     if (!isValidObjectId(userId)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID пользователя", {
+        formatResponse(false, null, "Nesprávny formát ID používateľa", {
           type: "VALIDATION_ERROR",
           field: "userId",
         })
@@ -188,7 +190,7 @@ class CommentController {
     const comments = await commentService.getUserComments(userId, options);
 
     res.json(
-      formatResponse(true, comments, "Комментарии пользователя получены")
+      formatResponse(true, comments, "Komentáre používateľa boli získané")
     );
   });
 
@@ -201,7 +203,7 @@ class CommentController {
     // Валидация ID
     if (!isValidObjectId(id)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID комментария", {
+        formatResponse(false, null, "Nesprávny formát ID komentára", {
           type: "VALIDATION_ERROR",
           field: "id",
         })
@@ -214,7 +216,7 @@ class CommentController {
         formatResponse(
           false,
           null,
-          "Комментарий должен содержать минимум 5 символов",
+          "Komentár musí obsahovať minimálne 5 znakov",
           {
             type: "VALIDATION_ERROR",
             field: "content",
@@ -228,7 +230,7 @@ class CommentController {
         formatResponse(
           false,
           null,
-          "Комментарий должен содержать максимум 1000 символов",
+          "Komentár môže obsahovať maximálne 1000 znakov",
           {
             type: "VALIDATION_ERROR",
             field: "content",
@@ -248,7 +250,7 @@ class CommentController {
     );
 
     res.json(
-      formatResponse(true, updatedComment, "Комментарий успешно обновлен")
+      formatResponse(true, updatedComment, "Komentár bol úspešne aktualizovaný")
     );
   });
 
@@ -260,7 +262,7 @@ class CommentController {
     // Валидация ID
     if (!isValidObjectId(id)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID комментария", {
+        formatResponse(false, null, "Nesprávny formát ID komentára", {
           type: "VALIDATION_ERROR",
           field: "id",
         })
@@ -269,7 +271,7 @@ class CommentController {
 
     await commentService.deleteComment(id, userId);
 
-    res.json(formatResponse(true, null, "Комментарий успешно удален"));
+    res.json(formatResponse(true, null, "Komentár bol úspešne odstránený"));
   });
 
   // Лайк/дизлайк комментария
@@ -280,7 +282,7 @@ class CommentController {
     // Валидация ID
     if (!isValidObjectId(id)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID комментария", {
+        formatResponse(false, null, "Nesprávny formát ID komentára", {
           type: "VALIDATION_ERROR",
           field: "id",
         })
@@ -293,7 +295,7 @@ class CommentController {
 
     logUserAction(
       userId,
-      result.action === "added" ? "COMMENT_LIKED" : "COMMENT_UNLIKED",
+      result.action === "added" ? "KOMENTÁR OBLÚBENÝ" : "KOMENTÁR NEOBLÚBENÝ",
       `${result.action} like for comment ${id}`
     );
 
@@ -320,7 +322,7 @@ class CommentController {
     // Валидация ID
     if (!isValidObjectId(id)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID комментария", {
+        formatResponse(false, null, "Nesprávny formát ID komentára", {
           type: "VALIDATION_ERROR",
           field: "id",
         })
@@ -329,7 +331,7 @@ class CommentController {
 
     if (typeof isApproved !== "boolean") {
       return res.status(400).json(
-        formatResponse(false, null, "Параметр isApproved должен быть boolean", {
+        formatResponse(false, null, "Parameter isApproved musí byť boolean", {
           type: "VALIDATION_ERROR",
           field: "isApproved",
         })
@@ -342,8 +344,8 @@ class CommentController {
       moderatorId
     );
 
-    const action = isApproved ? "одобрен" : "отклонен";
-    res.json(formatResponse(true, moderatedComment, `Комментарий ${action}`));
+    const action = isApproved ? "schválený" : "zamietnutý";
+    res.json(formatResponse(true, moderatedComment, `Komentár bol ${action}`));
   });
 
   // Получение комментариев на модерации (только админы)
@@ -354,7 +356,11 @@ class CommentController {
     const pendingComments = await commentService.getPendingComments(options);
 
     res.json(
-      formatResponse(true, pendingComments, "Комментарии на модерации получены")
+      formatResponse(
+        true,
+        pendingComments,
+        "Komentáre na moderáciu boli získané"
+      )
     );
   });
 
@@ -369,7 +375,7 @@ class CommentController {
         formatResponse(
           false,
           null,
-          "Поисковый запрос должен содержать минимум 2 символа",
+          "Vyhľadávací dopyt musí obsahovať minimálne 2 znaky",
           {
             type: "VALIDATION_ERROR",
             field: "query",
@@ -381,7 +387,7 @@ class CommentController {
     // Валидация userId (если указан)
     if (userId && !isValidObjectId(userId)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID пользователя", {
+        formatResponse(false, null, "Nesprávny formát ID používateľa", {
           type: "VALIDATION_ERROR",
           field: "userId",
         })
@@ -397,7 +403,11 @@ class CommentController {
     const results = await commentService.searchComments(query.trim(), options);
 
     res.json(
-      formatResponse(true, results, "Результаты поиска комментариев получены")
+      formatResponse(
+        true,
+        results,
+        "Výsledky vyhľadávania komentárov boli získané"
+      )
     );
   });
 
@@ -406,7 +416,7 @@ class CommentController {
     const statistics = await commentService.getCommentStatistics();
 
     res.json(
-      formatResponse(true, statistics, "Статистика комментариев получена")
+      formatResponse(true, statistics, "Štatistika komentárov bola získaná")
     );
   });
 
@@ -422,7 +432,7 @@ class CommentController {
     const popularComments = await commentService.getPopularComments(options);
 
     res.json(
-      formatResponse(true, popularComments, "Популярные комментарии получены")
+      formatResponse(true, popularComments, "Populárne komentáre boli získané")
     );
   });
 }

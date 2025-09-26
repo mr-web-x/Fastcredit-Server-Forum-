@@ -58,7 +58,7 @@ class QuestionController {
 
     const questions = await questionService.getQuestions(options);
 
-    res.json(formatResponse(true, questions, "Список вопросов получен"));
+    res.json(formatResponse(true, questions, "Zoznam otázok bol získaný"));
   });
 
   // Получение вопросов в ожидании ответа (для экспертов)
@@ -74,7 +74,7 @@ class QuestionController {
 
     const questions = await questionService.getPendingQuestions(options);
 
-    res.json(formatResponse(true, questions, "Вопросы в ожидании получены"));
+    res.json(formatResponse(true, questions, "Otázky čakajúce na odpoveď boli získané"));
   });
 
   // Получение конкретного вопроса по slug
@@ -90,7 +90,7 @@ class QuestionController {
         .json(formatResponse(false, null, ERROR_MESSAGES.QUESTION_NOT_FOUND));
     }
 
-    res.json(formatResponse(true, question, "Вопрос найден"));
+    res.json(formatResponse(true, question, "Otázka bola nájdená"));
   });
 
   // Создание нового вопроса
@@ -104,7 +104,7 @@ class QuestionController {
         formatResponse(
           false,
           null,
-          "Заголовок должен содержать минимум 10 символов",
+          "Nadpis musí obsahovať minimálne 10 znakov",
           {
             type: "VALIDATION_ERROR",
             field: "title",
@@ -118,7 +118,7 @@ class QuestionController {
         formatResponse(
           false,
           null,
-          "Содержание должно содержать минимум 20 символов",
+          "Obsah musí obsahovať minimálne 20 znakov",
           {
             type: "VALIDATION_ERROR",
             field: "content",
@@ -167,7 +167,7 @@ class QuestionController {
     if (Object.keys(updateData).length === 0) {
       return res
         .status(400)
-        .json(formatResponse(false, null, "Нет данных для обновления"));
+        .json(formatResponse(false, null, "Žiadne údaje na aktualizáciu"));
     }
 
     const updatedQuestion = await questionService.updateQuestion(
@@ -176,7 +176,7 @@ class QuestionController {
       userId
     );
 
-    res.json(formatResponse(true, updatedQuestion, "Вопрос успешно обновлен"));
+    res.json(formatResponse(true, updatedQuestion, "Otázka bola úspešne aktualizovaná"));
   });
 
   // Удаление вопроса
@@ -186,7 +186,7 @@ class QuestionController {
 
     await questionService.deleteQuestion(id, userId);
 
-    res.json(formatResponse(true, null, "Вопрос успешно удален"));
+    res.json(formatResponse(true, null, "Otázka bola úspešne odstránená"));
   });
 
   // Поиск вопросов
@@ -199,7 +199,7 @@ class QuestionController {
         formatResponse(
           false,
           null,
-          "Поисковый запрос должен содержать минимум 2 символа",
+          "Vyhľadávací dopyt musí obsahovať minimálne 2 znaky",
           {
             type: "VALIDATION_ERROR",
             field: "query",
@@ -214,7 +214,7 @@ class QuestionController {
       options
     );
 
-    res.json(formatResponse(true, results, "Результаты поиска получены"));
+    res.json(formatResponse(true, results, "Výsledky vyhľadávania boli získané"));
   });
 
   // Лайк/дизлайк вопроса
@@ -256,7 +256,7 @@ class QuestionController {
       parseInt(limit)
     );
 
-    res.json(formatResponse(true, similarQuestions, "Похожие вопросы найдены"));
+    res.json(formatResponse(true, similarQuestions, "Podobné otázky boli nájdené"));
   });
 
   // Изменение статуса вопроса (только админы)
@@ -267,7 +267,7 @@ class QuestionController {
 
     if (!Object.values(QUESTION_STATUS).includes(status)) {
       return res.status(400).json(
-        formatResponse(false, null, "Недопустимый статус вопроса", {
+        formatResponse(false, null, "Neplatný stav otázky", {
           type: "VALIDATION_ERROR",
           field: "status",
           allowedValues: Object.values(QUESTION_STATUS),
@@ -281,14 +281,14 @@ class QuestionController {
       userId
     );
 
-    res.json(formatResponse(true, updatedQuestion, "Статус вопроса изменен"));
+    res.json(formatResponse(true, updatedQuestion, "Stav otázky bol zmenený"));
   });
 
   // Получение статистики вопросов (только админы)
   getQuestionStatistics = asyncHandler(async (req, res) => {
     const statistics = await questionService.getQuestionStatistics();
 
-    res.json(formatResponse(true, statistics, "Статистика вопросов получена"));
+    res.json(formatResponse(true, statistics, "Štatistika otázok bola získaná"));
   });
 
   // Получение вопросов пользователя
@@ -312,7 +312,7 @@ class QuestionController {
     // Используем правильный метод сервиса
     const questions = await questionService.getUserQuestions(userId, options);
 
-    res.json(formatResponse(true, questions, "Вопросы пользователя получены"));
+    res.json(formatResponse(true, questions, "Otázky používateľa boli získané"));
   });
 
   // Валидация slug вопроса
@@ -332,7 +332,7 @@ class QuestionController {
           error: validation.error || null,
           available: validation.isValid && !exists,
         },
-        "Валидация slug выполнена"
+        "Validácia slug bola vykonaná"
       )
     );
   });
@@ -349,7 +349,7 @@ class QuestionController {
 
     const topQuestions = await questionService.getTopQuestions(options);
 
-    res.json(formatResponse(true, topQuestions, "Топ вопросы получены"));
+    res.json(formatResponse(true, topQuestions, "Top otázky boli získané"));
   });
 }
 

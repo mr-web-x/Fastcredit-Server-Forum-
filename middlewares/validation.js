@@ -21,7 +21,7 @@ export const handleValidationErrors = (req, res, next) => {
     );
 
     return res.status(400).json(
-      formatResponse(false, null, ERROR_MESSAGES.VALIDATION_ERROR, {
+      formatResponse(false, null, "Chyba validácie", {
         type: "ValidationError",
         details: errorArray.map((error) => ({
           field: error.path || error.param,
@@ -44,7 +44,7 @@ export const validateQuestionCreate = [
       max: CONTENT_LIMITS.QUESTION_TITLE_MAX,
     })
     .withMessage(
-      `Заголовок должен быть от ${CONTENT_LIMITS.QUESTION_TITLE_MIN} до ${CONTENT_LIMITS.QUESTION_TITLE_MAX} символов`
+      `Názov musí mať od ${CONTENT_LIMITS.QUESTION_TITLE_MIN} do ${CONTENT_LIMITS.QUESTION_TITLE_MAX} znakov`
     )
     .escape(),
 
@@ -55,7 +55,7 @@ export const validateQuestionCreate = [
       max: CONTENT_LIMITS.QUESTION_CONTENT_MAX,
     })
     .withMessage(
-      `Содержание должно быть от ${CONTENT_LIMITS.QUESTION_CONTENT_MIN} до ${CONTENT_LIMITS.QUESTION_CONTENT_MAX} символов`
+      `Obsah musí mať od ${CONTENT_LIMITS.QUESTION_CONTENT_MIN} do ${CONTENT_LIMITS.QUESTION_CONTENT_MAX} znakov`
     )
     .escape(),
 
@@ -64,7 +64,7 @@ export const validateQuestionCreate = [
     .trim()
     .isAlphanumeric("en-US", { ignore: "_-" })
     .withMessage(
-      "Категория может содержать только буквы, цифры, дефисы и подчеркивания"
+      "Kategória môže obsahovať iba písmená, čísla, pomlčky a podčiarknutia"
     )
     .escape(),
 
@@ -73,7 +73,7 @@ export const validateQuestionCreate = [
 
 // Валидация для обновления вопроса
 export const validateQuestionUpdate = [
-  param("id").isMongoId().withMessage("Неверный ID вопроса"),
+  param("id").isMongoId().withMessage("Neplatné ID otázky"),
 
   body("title")
     .optional()
@@ -83,7 +83,7 @@ export const validateQuestionUpdate = [
       max: CONTENT_LIMITS.QUESTION_TITLE_MAX,
     })
     .withMessage(
-      `Заголовок должен быть от ${CONTENT_LIMITS.QUESTION_TITLE_MIN} до ${CONTENT_LIMITS.QUESTION_TITLE_MAX} символов`
+      `Názov musí mať od ${CONTENT_LIMITS.QUESTION_TITLE_MIN} do ${CONTENT_LIMITS.QUESTION_TITLE_MAX} znakov`
     )
     .escape(),
 
@@ -95,7 +95,7 @@ export const validateQuestionUpdate = [
       max: CONTENT_LIMITS.QUESTION_CONTENT_MAX,
     })
     .withMessage(
-      `Содержание должно быть от ${CONTENT_LIMITS.QUESTION_CONTENT_MIN} до ${CONTENT_LIMITS.QUESTION_CONTENT_MAX} символов`
+      `Obsah musí mať od ${CONTENT_LIMITS.QUESTION_CONTENT_MIN} do ${CONTENT_LIMITS.QUESTION_CONTENT_MAX} znakov`
     )
     .escape(),
 
@@ -104,7 +104,7 @@ export const validateQuestionUpdate = [
 
 // Валидация для создания ответа
 export const validateAnswerCreate = [
-  param("questionId").isMongoId().withMessage("Неверный ID вопроса"),
+  param("questionId").isMongoId().withMessage("Neplatné ID otázky"),
 
   body("content")
     .trim()
@@ -113,7 +113,7 @@ export const validateAnswerCreate = [
       max: CONTENT_LIMITS.ANSWER_CONTENT_MAX,
     })
     .withMessage(
-      `Ответ должен быть от ${CONTENT_LIMITS.ANSWER_CONTENT_MIN} до ${CONTENT_LIMITS.ANSWER_CONTENT_MAX} символов`
+      `Odpoveď musí mať od ${CONTENT_LIMITS.ANSWER_CONTENT_MIN} do ${CONTENT_LIMITS.ANSWER_CONTENT_MAX} znakov`
     )
     .escape(),
 
@@ -122,7 +122,7 @@ export const validateAnswerCreate = [
 
 // Валидация для создания комментария
 export const validateCommentCreate = [
-  param("questionId").isMongoId().withMessage("Неверный ID вопроса"),
+  param("questionId").isMongoId().withMessage("Neplatné ID otázky"),
 
   body("content")
     .trim()
@@ -131,14 +131,14 @@ export const validateCommentCreate = [
       max: CONTENT_LIMITS.COMMENT_CONTENT_MAX,
     })
     .withMessage(
-      `Комментарий должен быть от ${CONTENT_LIMITS.COMMENT_CONTENT_MIN} до ${CONTENT_LIMITS.COMMENT_CONTENT_MAX} символов`
+      `Komentár musí mať od ${CONTENT_LIMITS.COMMENT_CONTENT_MIN} do ${CONTENT_LIMITS.COMMENT_CONTENT_MAX} znakov`
     )
     .escape(),
 
   body("parentComment")
     .optional()
     .isMongoId()
-    .withMessage("Неверный ID родительского комментария"),
+    .withMessage("Neplatné ID rodičovského komentára"),
 
   handleValidationErrors,
 ];
@@ -150,31 +150,31 @@ export const validateProfileUpdate = [
     .trim()
     .isLength({ max: CONTENT_LIMITS.BIO_MAX })
     .withMessage(
-      `Биография не может превышать ${CONTENT_LIMITS.BIO_MAX} символов`
+      `Biografia nemôže presiahnuť ${CONTENT_LIMITS.BIO_MAX} znakov`
     )
     .escape(),
 
   body("avatar")
     .optional()
     .isURL()
-    .withMessage("Неверный формат URL для аватара"),
+    .withMessage("Neplatný formát URL pre avatar"),
 
   handleValidationErrors,
 ];
 
 // Валидация для изменения роли пользователя (админ)
 export const validateRoleChange = [
-  param("id").isMongoId().withMessage("Неверный ID пользователя"),
+  param("id").isMongoId().withMessage("Neplatné ID používateľa"),
 
   body("role")
     .isIn(["user", "expert", "admin"])
-    .withMessage("Роль должна быть: user, expert или admin"),
+    .withMessage("Rola musí byť: user, expert alebo admin"),
 
   body("reason")
     .optional()
     .trim()
     .isLength({ max: 500 })
-    .withMessage("Причина не может превышать 500 символов")
+    .withMessage("Dôvod nemôže presiahnuť 500 znakov")
     .escape(),
 
   handleValidationErrors,
@@ -182,41 +182,41 @@ export const validateRoleChange = [
 
 // Валидация для бана пользователя
 export const validateUserBan = [
-  param("id").isMongoId().withMessage("Неверный ID пользователя"),
+  param("id").isMongoId().withMessage("Neplatné ID používateľa"),
 
   body("reason")
     .trim()
     .isLength({ min: 10, max: 500 })
-    .withMessage("Причина бана должна быть от 10 до 500 символов")
+    .withMessage("Dôvod banu musí byť od 10 do 500 znakov")
     .escape(),
 
   body("duration")
     .optional()
     .isInt({ min: 1, max: 365 })
-    .withMessage("Длительность бана должна быть от 1 до 365 дней"),
+    .withMessage("Dĺžka banu musí byť od 1 do 365 dní"),
 
   handleValidationErrors,
 ];
 
 // Валидация для создания жалобы
 export const validateReportCreate = [
-  body("targetId").isMongoId().withMessage("Неверный ID объекта жалобы"),
+  body("targetId").isMongoId().withMessage("Neplatné ID objektu sťažnosti"),
 
   body("targetType")
     .isIn(["question", "answer", "comment"])
-    .withMessage("Тип объекта должен быть: question, answer или comment"),
+    .withMessage("Typ objektu musí byť: question, answer alebo comment"),
 
   body("reason")
     .isIn(["spam", "inappropriate", "offensive", "other"])
     .withMessage(
-      "Причина должна быть: spam, inappropriate, offensive или other"
+      "Dôvod musí byť: spam, nevhodné, urážlivé alebo iné"
     ),
 
   body("description")
     .optional()
     .trim()
     .isLength({ max: 1000 })
-    .withMessage("Описание не может превышать 1000 символов")
+    .withMessage("Popis nemôže presiahnuť 1000 znakov")
     .escape(),
 
   handleValidationErrors,
@@ -227,18 +227,18 @@ export const validateSearch = [
   query("q")
     .trim()
     .isLength({ min: 2, max: 100 })
-    .withMessage("Поисковый запрос должен быть от 2 до 100 символов")
+    .withMessage("Vyhľadávací dopyt musí byť od 2 do 100 znakov")
     .escape(),
 
   query("page")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("Номер страницы должен быть положительным числом"),
+    .withMessage("Číslo stránky musí byť kladné číslo"),
 
   query("limit")
     .optional()
     .isInt({ min: 1, max: 50 })
-    .withMessage("Лимит результатов должен быть от 1 до 50"),
+    .withMessage("Limit výsledkov musí byť od 1 do 50"),
 
   handleValidationErrors,
 ];
@@ -248,19 +248,19 @@ export const validatePagination = [
   query("page")
     .optional()
     .isInt({ min: 1 })
-    .withMessage("Номер страницы должен быть положительным числом"),
+    .withMessage("Číslo stránky musí byť kladné číslo"),
 
   query("limit")
     .optional()
     .isInt({ min: 1, max: 50 })
-    .withMessage("Лимит результатов должен быть от 1 до 50"),
+    .withMessage("Limit výsledkov musí byť od 1 do 50"),
 
   handleValidationErrors,
 ];
 
 // Валидация MongoDB ObjectId параметра
 export const validateObjectId = (paramName = "id") => [
-  param(paramName).isMongoId().withMessage(`Неверный ${paramName}`),
+  param(paramName).isMongoId().withMessage(`Neplatné ${paramName}`),
 
   handleValidationErrors,
 ];

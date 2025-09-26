@@ -69,7 +69,7 @@ export const createApiLimiter = () => {
       formatResponse(
         false,
         null,
-        "Превышен лимит API запросов. Попробуйте позже.",
+        "Bol prekročený limit API požiadaviek. Skúste to neskôr.",
         {
           type: "RATE_LIMIT_EXCEEDED",
           resetTime: new Date(Date.now() + config.RATE_LIMIT.WINDOW_MS),
@@ -110,7 +110,7 @@ export const createQuestionLimiter = () => {
       return formatResponse(
         false,
         null,
-        `Превышен лимит создания вопросов (${maxQuestions} в час). Попробуйте позже.`,
+        `Bol prekročený limit vytvárania otázok (${maxQuestions} za hodinu). Skúste to neskôr.`,
         {
           type: "QUESTION_RATE_LIMIT_EXCEEDED",
           maxQuestions,
@@ -140,7 +140,7 @@ export const createAnswerLimiter = () => {
       formatResponse(
         false,
         null,
-        `Превышен лимит создания ответов (${config.RATE_LIMIT.EXPERT.ANSWERS} в час). Попробуйте позже.`,
+        `Bol prekročený limit vytvárania odpovedí (${config.RATE_LIMIT.EXPERT.ANSWERS} za hodinu). Skúste to neskôr.`,
         {
           type: "ANSWER_RATE_LIMIT_EXCEEDED",
           maxAnswers: config.RATE_LIMIT.EXPERT.ANSWERS,
@@ -181,7 +181,7 @@ export const createCommentLimiter = () => {
       return formatResponse(
         false,
         null,
-        `Превышен лимит создания комментариев (${maxComments} в час). Попробуйте позже.`,
+        `Bol prekročený limit vytvárania komentárov (${maxComments} za hodinu). Skúste to neskôr.`,
         {
           type: "COMMENT_RATE_LIMIT_EXCEEDED",
           maxComments,
@@ -207,7 +207,7 @@ export const createLikeLimiter = () => {
     message: formatResponse(
       false,
       null,
-      `Превышен лимит лайков (${config.RATE_LIMIT.USER.LIKES} в час). Попробуйте позже.`,
+      `Bol prekročený limit lajkov (${config.RATE_LIMIT.USER.LIKES} za hodinu). Skúste to neskôr.`,
       {
         type: "LIKE_RATE_LIMIT_EXCEEDED",
         maxLikes: config.RATE_LIMIT.USER.LIKES,
@@ -232,7 +232,7 @@ export const createAuthLimiter = () => {
     message: formatResponse(
       false,
       null,
-      "Слишком много попыток входа. Попробуйте через 15 минут.",
+      "Príliš veľa pokusov o prihlásenie. Skúste to o 15 minút.",
       {
         type: "AUTH_RATE_LIMIT_EXCEEDED",
         resetTime: new Date(Date.now() + 15 * 60 * 1000),
@@ -304,7 +304,7 @@ export const checkCustomRateLimit = (action) => {
           formatResponse(
             false,
             null,
-            `Превышен лимит для действия ${action}. Попробуйте позже.`,
+            `Bol prekročený limit pre akciu ${action}. Skúste to neskôr.`,
             {
               type: "CUSTOM_RATE_LIMIT_EXCEEDED",
               action,

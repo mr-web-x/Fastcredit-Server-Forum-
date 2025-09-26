@@ -16,7 +16,7 @@ class NotificationService {
       );
 
       if (!question) {
-        throw new Error("Question not found");
+        throw new Error("Otázka nebola nájdená");
       }
 
       // Получаем всех активных экспертов
@@ -59,14 +59,14 @@ class NotificationService {
         .populate("expert", "firstName lastName email role avatar");
 
       if (!answer) {
-        throw new Error("Answer not found");
+        throw new Error("Odpoveď nebola nájdená");
       }
 
       const question = answer.questionId;
       const author = await User.findById(question.author).select("email");
 
       if (!author) {
-        throw new Error("Question author not found");
+        throw new Error("Autor otázky nebol nájdený");
       }
 
       // Не уведомляем, если эксперт отвечает на свой вопрос (хотя это и запрещено)
@@ -103,7 +103,7 @@ class NotificationService {
         .populate("moderatedBy", "email");
 
       if (!answer) {
-        throw new Error("Answer not found");
+        throw new Error("Odpoveď nebola nájdená");
       }
 
       const status = isApproved ? "approved" : "rejected";
@@ -139,7 +139,7 @@ class NotificationService {
         .populate("expert", "email");
 
       if (!answer || !answer.isAccepted) {
-        throw new Error("Answer not found or not accepted");
+        throw new Error("Odpoveď nebola nájdená alebo nebola prijatá");
       }
 
       const question = answer.questionId;
@@ -172,7 +172,7 @@ class NotificationService {
       ]);
 
       if (!user) {
-        throw new Error("User not found");
+        throw new Error("Používateľ nebol nájdený");
       }
 
       logUserAction(
@@ -204,7 +204,7 @@ class NotificationService {
       ]);
 
       if (!user) {
-        throw new Error("User not found");
+        throw new Error("Používateľ nebol nájdený");
       }
 
       const isPermanent = !bannedUntil;
@@ -301,7 +301,7 @@ class NotificationService {
         .populate("parentComment");
 
       if (!comment) {
-        throw new Error("Comment not found");
+        throw new Error("Komentár nebol nájdený");
       }
 
       const notifications = [];

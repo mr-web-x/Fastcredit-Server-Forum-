@@ -16,7 +16,7 @@ class RateLimitService {
     try {
       const user = await User.findById(userId);
       if (!user) {
-        throw new Error("User not found");
+        throw new Error("Používateľ nebol nájdený");
       }
 
       const limits = this.getLimitsForRole(user.role);
@@ -79,7 +79,7 @@ class RateLimitService {
     try {
       const admin = await User.findById(adminId);
       if (!admin || admin.role !== USER_ROLES.ADMIN) {
-        throw new Error("Only admins can reset rate limits");
+        throw new Error("Len administrátori môžu resetovať limity");
       }
 
       const query = { userId };
@@ -401,7 +401,7 @@ class RateLimitService {
     try {
       const admin = await User.findById(adminId);
       if (!admin || admin.role !== USER_ROLES.ADMIN) {
-        throw new Error("Only admins can grant temporary limit increases");
+        throw new Error("Len administrátori môžu udeliť dočasné zvýšenie limitu");
       }
 
       // В реальном проекте можно добавить поле temporaryLimitIncrease в User модель

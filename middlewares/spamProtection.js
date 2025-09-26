@@ -192,7 +192,7 @@ export const checkSpam = (options = {}) => {
           formatResponse(
             false,
             null,
-            "Контент заблокирован системой защиты от спама",
+            "Obsah bol zablokovaný systémom ochrany proti spamu",
             {
               type: "SPAM_BLOCKED",
               spamScore: spamScore,
@@ -259,11 +259,11 @@ export const checkDuplicateContent = (Model, field = "content") => {
             formatResponse(
               false,
               null,
-              "Обнаружен дублированный контент. Попробуйте изменить текст.",
+              "Bol zistený duplicitný obsah. Skúste upraviť text.",
               {
                 type: "DUPLICATE_CONTENT",
                 message:
-                  "Вы уже публиковали похожий контент в течение последних 24 часов",
+                  "Už ste publikovali podobný obsah za posledných 24 hodín",
               }
             )
           );
@@ -313,7 +313,7 @@ export const checkPostingFrequency = (windowMs = 60000, maxPosts = 3) => {
         formatResponse(
           false,
           null,
-          `Слишком частые публикации. Максимум ${maxPosts} публикаций в минуту.`,
+          `Príliš časté publikovanie. Maximálne ${maxPosts} príspevkov za minútu.`,
           {
             type: "POSTING_FREQUENCY_LIMITED",
             current: recentPosts.length,

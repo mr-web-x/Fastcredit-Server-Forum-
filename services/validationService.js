@@ -19,19 +19,19 @@ class ValidationService {
       // Валидация заголовка
       if (!isUpdate || title !== undefined) {
         if (!title || typeof title !== "string") {
-          errors.push({ field: "title", message: "Заголовок обязателен" });
+          errors.push({ field: "title", message: "Nadpis je povinný" });
         } else {
           const trimmedTitle = title.trim();
           if (trimmedTitle.length < CONTENT_LIMITS.QUESTION_TITLE_MIN) {
             errors.push({
               field: "title",
-              message: `Заголовок должен содержать минимум ${CONTENT_LIMITS.QUESTION_TITLE_MIN} символов`,
+              message: `Nadpis musí obsahovať minimálne ${CONTENT_LIMITS.QUESTION_TITLE_MIN} znakov`,
             });
           }
           if (trimmedTitle.length > CONTENT_LIMITS.QUESTION_TITLE_MAX) {
             errors.push({
               field: "title",
-              message: `Заголовок должен содержать максимум ${CONTENT_LIMITS.QUESTION_TITLE_MAX} символов`,
+              message: `Nadpis môže obsahovať maximálne ${CONTENT_LIMITS.QUESTION_TITLE_MAX} znakov`,
             });
           }
 
@@ -39,7 +39,7 @@ class ValidationService {
           if (this.containsInvalidCharacters(trimmedTitle)) {
             errors.push({
               field: "title",
-              message: "Заголовок содержит недопустимые символы",
+              message: "Nadpis obsahuje nepovolené znaky",
             });
           }
         }
@@ -48,19 +48,19 @@ class ValidationService {
       // Валидация контента
       if (!isUpdate || content !== undefined) {
         if (!content || typeof content !== "string") {
-          errors.push({ field: "content", message: "Содержание обязательно" });
+          errors.push({ field: "content", message: "Obsah je povinný" });
         } else {
           const trimmedContent = content.trim();
           if (trimmedContent.length < CONTENT_LIMITS.QUESTION_CONTENT_MIN) {
             errors.push({
               field: "content",
-              message: `Содержание должно содержать минимум ${CONTENT_LIMITS.QUESTION_CONTENT_MIN} символов`,
+              message: `Obsah musí obsahovať minimálne ${CONTENT_LIMITS.QUESTION_CONTENT_MIN} znakov`,
             });
           }
           if (trimmedContent.length > CONTENT_LIMITS.QUESTION_CONTENT_MAX) {
             errors.push({
               field: "content",
-              message: `Содержание должно содержать максимум ${CONTENT_LIMITS.QUESTION_CONTENT_MAX} символов`,
+              message: `Obsah môže obsahovať maximálne ${CONTENT_LIMITS.QUESTION_CONTENT_MAX} znakov`,
             });
           }
         }
@@ -69,14 +69,14 @@ class ValidationService {
       // Валидация категории (опционально)
       if (category !== undefined) {
         if (typeof category !== "string" || !this.isValidCategory(category)) {
-          errors.push({ field: "category", message: "Недопустимая категория" });
+          errors.push({ field: "category", message: "Neplatná kategória" });
         }
       }
 
       // Валидация приоритета (опционально)
       if (priority !== undefined) {
         if (!Object.values(QUESTION_PRIORITY).includes(priority)) {
-          errors.push({ field: "priority", message: "Недопустимый приоритет" });
+          errors.push({ field: "priority", message: "Neplatná priorita" });
         }
       }
 
@@ -88,7 +88,7 @@ class ValidationService {
       logError(error, "ValidationService.validateQuestionData");
       return {
         isValid: false,
-        errors: [{ field: "general", message: "Ошибка валидации данных" }],
+        errors: [{ field: "general", message: "Chyba pri validácii údajov" }],
       };
     }
   }
@@ -103,31 +103,31 @@ class ValidationService {
       if (!content || typeof content !== "string") {
         errors.push({
           field: "content",
-          message: "Содержание ответа обязательно",
+          message: "Obsah odpovede je povinný",
         });
       } else {
         const trimmedContent = content.trim();
         if (trimmedContent.length < CONTENT_LIMITS.ANSWER_CONTENT_MIN) {
           errors.push({
             field: "content",
-            message: `Ответ должен содержать минимум ${CONTENT_LIMITS.ANSWER_CONTENT_MIN} символов`,
+            message: `Odpoveď musí obsahovať minimálne ${CONTENT_LIMITS.ANSWER_CONTENT_MIN} znakov`,
           });
         }
         if (trimmedContent.length > CONTENT_LIMITS.ANSWER_CONTENT_MAX) {
           errors.push({
             field: "content",
-            message: `Ответ должен содержать максимум ${CONTENT_LIMITS.ANSWER_CONTENT_MAX} символов`,
+            message: `Odpoveď môže obsahovať maximálne ${CONTENT_LIMITS.ANSWER_CONTENT_MAX} znakov`,
           });
         }
       }
 
       // Валидация ID вопроса
       if (!questionId) {
-        errors.push({ field: "questionId", message: "ID вопроса обязателен" });
+        errors.push({ field: "questionId", message: "ID otázky je povinné" });
       } else if (!isValidObjectId(questionId)) {
         errors.push({
           field: "questionId",
-          message: "Недопустимый формат ID вопроса",
+          message: "Neplatný formát ID otázky",
         });
       }
 
@@ -140,7 +140,7 @@ class ValidationService {
       return {
         isValid: false,
         errors: [
-          { field: "general", message: "Ошибка валидации данных ответа" },
+          { field: "general", message: "Chyba pri validácii údajov odpovede" },
         ],
       };
     }
@@ -156,31 +156,31 @@ class ValidationService {
       if (!content || typeof content !== "string") {
         errors.push({
           field: "content",
-          message: "Содержание комментария обязательно",
+          message: "Obsah komentára je povinný",
         });
       } else {
         const trimmedContent = content.trim();
         if (trimmedContent.length < CONTENT_LIMITS.COMMENT_CONTENT_MIN) {
           errors.push({
             field: "content",
-            message: `Комментарий должен содержать минимум ${CONTENT_LIMITS.COMMENT_CONTENT_MIN} символов`,
+            message: `Komentár musí obsahovať minimálne ${CONTENT_LIMITS.COMMENT_CONTENT_MIN} znakov`,
           });
         }
         if (trimmedContent.length > CONTENT_LIMITS.COMMENT_CONTENT_MAX) {
           errors.push({
             field: "content",
-            message: `Комментарий должен содержать максимум ${CONTENT_LIMITS.COMMENT_CONTENT_MAX} символов`,
+            message: `Komentár môže obsahovať maximálne ${CONTENT_LIMITS.COMMENT_CONTENT_MAX} znakov`,
           });
         }
       }
 
       // Валидация ID вопроса
       if (!questionId) {
-        errors.push({ field: "questionId", message: "ID вопроса обязателен" });
+        errors.push({ field: "questionId", message: "ID otázky je povinné" });
       } else if (!isValidObjectId(questionId)) {
         errors.push({
           field: "questionId",
-          message: "Недопустимый формат ID вопроса",
+          message: "Neplatný formát ID otázky",
         });
       }
 
@@ -188,7 +188,7 @@ class ValidationService {
       if (parentComment && !isValidObjectId(parentComment)) {
         errors.push({
           field: "parentComment",
-          message: "Недопустимый формат ID родительского комментария",
+          message: "Neplatný formát ID rodičovského komentára",
         });
       }
 
@@ -201,7 +201,7 @@ class ValidationService {
       return {
         isValid: false,
         errors: [
-          { field: "general", message: "Ошибка валидации данных комментария" },
+          { field: "general", message: "Chyba pri validácii údajov komentára" },
         ],
       };
     }
@@ -216,9 +216,9 @@ class ValidationService {
       // Валидация email
       if (!isUpdate || email !== undefined) {
         if (!email || typeof email !== "string") {
-          errors.push({ field: "email", message: "Email обязателен" });
+          errors.push({ field: "email", message: "Email je povinný" });
         } else if (!this.isValidEmail(email)) {
-          errors.push({ field: "email", message: "Недопустимый формат email" });
+          errors.push({ field: "email", message: "Neplatný formát emailu" });
         }
       }
 
@@ -227,12 +227,12 @@ class ValidationService {
         if (typeof bio !== "string") {
           errors.push({
             field: "bio",
-            message: "Биография должна быть строкой",
+            message: "Biografia musí byť reťazec",
           });
         } else if (bio.length > CONTENT_LIMITS.BIO_MAX) {
           errors.push({
             field: "bio",
-            message: `Биография должна содержать максимум ${CONTENT_LIMITS.BIO_MAX} символов`,
+            message: `Biografia môže obsahovať maximálne ${CONTENT_LIMITS.BIO_MAX} znakov`,
           });
         }
       }
@@ -240,7 +240,7 @@ class ValidationService {
       // Валидация аватара (опционально)
       if (avatar !== undefined && avatar !== null) {
         if (typeof avatar !== "string" || !this.isValidUrl(avatar)) {
-          errors.push({ field: "avatar", message: "Недопустимый URL аватара" });
+          errors.push({ field: "avatar", message: "Neplatná URL adresa avatara" });
         }
       }
 
@@ -249,7 +249,7 @@ class ValidationService {
         if (!Object.values(USER_ROLES).includes(role)) {
           errors.push({
             field: "role",
-            message: "Недопустимая роль пользователя",
+            message: "Neplatná rola používateľa",
           });
         }
       }
@@ -263,7 +263,7 @@ class ValidationService {
       return {
         isValid: false,
         errors: [
-          { field: "general", message: "Ошибка валидации данных пользователя" },
+          { field: "general", message: "Chyba pri validácii údajov používateľa" },
         ],
       };
     }
@@ -277,11 +277,11 @@ class ValidationService {
 
       // Валидация целевого объекта
       if (!targetId) {
-        errors.push({ field: "targetId", message: "ID объекта обязателен" });
+        errors.push({ field: "targetId", message: "ID objektu je povinné" });
       } else if (!isValidObjectId(targetId)) {
         errors.push({
           field: "targetId",
-          message: "Недопустимый формат ID объекта",
+          message: "Neplatný formát ID objektu",
         });
       }
 
@@ -292,7 +292,7 @@ class ValidationService {
       ) {
         errors.push({
           field: "targetType",
-          message: "Недопустимый тип объекта",
+          message: "Neplatný typ objektu",
         });
       }
 
@@ -300,7 +300,7 @@ class ValidationService {
       if (!reason || !Object.values(REPORT_REASONS).includes(reason)) {
         errors.push({
           field: "reason",
-          message: "Недопустимая причина жалобы",
+          message: "Neplatný dôvod sťažnosti",
         });
       }
 
@@ -309,12 +309,12 @@ class ValidationService {
         if (typeof description !== "string") {
           errors.push({
             field: "description",
-            message: "Описание должно быть строкой",
+            message: "Popis musí byť reťazec",
           });
         } else if (description.length > 1000) {
           errors.push({
             field: "description",
-            message: "Описание должно содержать максимум 1000 символов",
+            message: "Popis môže obsahovať maximálne 1000 znakov",
           });
         }
       }
@@ -328,7 +328,7 @@ class ValidationService {
       return {
         isValid: false,
         errors: [
-          { field: "general", message: "Ошибка валидации данных жалобы" },
+          { field: "general", message: "Chyba pri validácii údajov sťažnosti" },
         ],
       };
     }
@@ -382,19 +382,19 @@ class ValidationService {
       const errors = [];
 
       if (!query || typeof query !== "string") {
-        errors.push({ field: "query", message: "Поисковый запрос обязателен" });
+        errors.push({ field: "query", message: "Vyhľadávací dopyt je povinný" });
       } else {
         const trimmedQuery = query.trim();
         if (trimmedQuery.length < 2) {
           errors.push({
             field: "query",
-            message: "Поисковый запрос должен содержать минимум 2 символа",
+            message: "Vyhľadávací dopyt musí obsahovať minimálne 2 znaky",
           });
         }
         if (trimmedQuery.length > 100) {
           errors.push({
             field: "query",
-            message: "Поисковый запрос должен содержать максимум 100 символов",
+            message: "Vyhľadávací dopyt môže obsahovať maximálne 100 znakov",
           });
         }
 
@@ -402,7 +402,7 @@ class ValidationService {
         if (this.containsInvalidCharacters(trimmedQuery)) {
           errors.push({
             field: "query",
-            message: "Поисковый запрос содержит недопустимые символы",
+            message: "Vyhľadávací dopyt obsahuje nepovolené znaky",
           });
         }
       }
@@ -417,7 +417,7 @@ class ValidationService {
       return {
         isValid: false,
         errors: [
-          { field: "general", message: "Ошибка валидации поискового запроса" },
+          { field: "general", message: "Chyba pri validácii vyhľadávacieho dopytu" },
         ],
         normalized: "",
       };
@@ -432,21 +432,21 @@ class ValidationService {
 
       // Валидация ID пользователя
       if (!userId) {
-        errors.push({ field: "userId", message: "ID пользователя обязателен" });
+        errors.push({ field: "userId", message: "ID používateľa je povinné" });
       } else if (!isValidObjectId(userId)) {
         errors.push({
           field: "userId",
-          message: "Недопустимый формат ID пользователя",
+          message: "Neplatný formát ID používateľa",
         });
       }
 
       // Валидация новой роли
       if (!newRole) {
-        errors.push({ field: "newRole", message: "Новая роль обязательна" });
+        errors.push({ field: "newRole", message: "Nová rola je povinná" });
       } else if (!Object.values(USER_ROLES).includes(newRole)) {
         errors.push({
           field: "newRole",
-          message: "Недопустимая роль пользователя",
+          message: "Neplatná rola používateľa",
         });
       }
 
@@ -455,12 +455,12 @@ class ValidationService {
         if (typeof reason !== "string") {
           errors.push({
             field: "reason",
-            message: "Причина должна быть строкой",
+            message: "Dôvod musí byť reťazec",
           });
         } else if (reason.length > 500) {
           errors.push({
             field: "reason",
-            message: "Причина должна содержать максимум 500 символов",
+            message: "Dôvod môže obsahovať maximálne 500 znakov",
           });
         }
       }
@@ -474,7 +474,7 @@ class ValidationService {
       return {
         isValid: false,
         errors: [
-          { field: "general", message: "Ошибка валидации данных смены роли" },
+          { field: "general", message: "Chyba pri validácii údajov zmeny roly" },
         ],
       };
     }
@@ -492,12 +492,12 @@ class ValidationService {
         if (isNaN(pageNum) || pageNum < 1) {
           errors.push({
             field: "page",
-            message: "Номер страницы должен быть положительным числом",
+            message: "Číslo stránky musí byť kladné číslo",
           });
         } else if (pageNum > 1000) {
           errors.push({
             field: "page",
-            message: "Номер страницы не может быть больше 1000",
+            message: "Číslo stránky nemôže byť väčšie ako 1000",
           });
         }
       }
@@ -508,12 +508,12 @@ class ValidationService {
         if (isNaN(limitNum) || limitNum < 1) {
           errors.push({
             field: "limit",
-            message: "Лимит должен быть положительным числом",
+            message: "Limit musí byť kladné číslo",
           });
         } else if (limitNum > 100) {
           errors.push({
             field: "limit",
-            message: "Лимит не может быть больше 100",
+            message: "Limit nemôže byť väčší ako 100",
           });
         }
       }
@@ -531,7 +531,7 @@ class ValidationService {
       return {
         isValid: false,
         errors: [
-          { field: "general", message: "Ошибка валидации данных пагинации" },
+          { field: "general", message: "Chyba pri validácii údajov stránkovania" },
         ],
         normalized: { page: 1, limit: 20 },
       };

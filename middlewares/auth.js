@@ -65,7 +65,7 @@ export const authenticate = async (req, res, next) => {
       );
       return res
         .status(401)
-        .json(formatResponse(false, null, ERROR_MESSAGES.UNAUTHORIZED));
+        .json(formatResponse(false, null, "Neautorizovaný prístup"));
     }
 
     const decoded = verifyToken(token);
@@ -86,7 +86,7 @@ export const authenticate = async (req, res, next) => {
       );
       return res
         .status(401)
-        .json(formatResponse(false, null, ERROR_MESSAGES.INVALID_TOKEN));
+        .json(formatResponse(false, null, "Neplatný token"));
     }
 
     // Проверяем активность пользователя
@@ -99,14 +99,14 @@ export const authenticate = async (req, res, next) => {
       );
       return res
         .status(401)
-        .json(formatResponse(false, null, "Аккаунт деактивирован"));
+        .json(formatResponse(false, null, "Účet je deaktivovaný"));
     }
 
     // Проверяем блокировку
     if (user.isBannedCurrently()) {
       const banMessage = user.bannedUntil
-        ? `Аккаунт заблокирован до ${user.bannedUntil.toLocaleDateString()}`
-        : "Аккаунт заблокирован";
+        ? `Účet je zablokovaný do ${user.bannedUntil.toLocaleDateString()}`
+        : "Účet je zablokovaný";
 
       logSecurityEvent("BANNED_USER_ATTEMPT", banMessage, user._id, req.ip);
       return res.status(403).json(formatResponse(false, null, banMessage));
@@ -129,7 +129,7 @@ export const authenticate = async (req, res, next) => {
       return res
         .status(401)
         .json(
-          formatResponse(false, null, "Токен истек. Необходимо войти заново")
+          formatResponse(false, null, "Token vypršal. Prosím, prihláste sa znova")
         );
     }
 
@@ -137,13 +137,13 @@ export const authenticate = async (req, res, next) => {
       logSecurityEvent("INVALID_TOKEN", "Invalid token format", null, req.ip);
       return res
         .status(401)
-        .json(formatResponse(false, null, ERROR_MESSAGES.INVALID_TOKEN));
+        .json(formatResponse(false, null, "Neplatný token"));
     }
 
     console.error("Auth middleware error:", error);
     return res
       .status(500)
-      .json(formatResponse(false, null, ERROR_MESSAGES.INTERNAL_SERVER_ERROR));
+      .json(formatResponse(false, null, "Interná chyba servera"));
   }
 };
 
@@ -187,7 +187,7 @@ export const requireRole = (roles) => {
     if (!req.user) {
       return res
         .status(401)
-        .json(formatResponse(false, null, ERROR_MESSAGES.UNAUTHORIZED));
+        .json(formatResponse(false, null, "Neautorizovaný prístup"));
     }
 
     if (!allowedRoles.includes(req.user.role)) {
@@ -202,7 +202,7 @@ export const requireRole = (roles) => {
 
       return res
         .status(403)
-        .json(formatResponse(false, null, ERROR_MESSAGES.FORBIDDEN));
+        .json(formatResponse(false, null, "Zakázané"));
     }
 
     next();
@@ -220,13 +220,13 @@ export const requireModerator = (req, res, next) => {
   if (!req.user) {
     return res
       .status(401)
-      .json(formatResponse(false, null, ERROR_MESSAGES.UNAUTHORIZED));
+      .json(formatResponse(false, null, "Neautorizovaný prístup"));
   }
 
   if (!req.user.canModerate) {
     return res
       .status(403)
-      .json(formatResponse(false, null, ERROR_MESSAGES.FORBIDDEN));
+      .json(formatResponse(false, null, "Zakázané"));
   }
 
   next();
@@ -238,7 +238,7 @@ export const requireOwnerOrAdmin = (getResourceOwner) => {
     if (!req.user) {
       return res
         .status(401)
-        .json(formatResponse(false, null, ERROR_MESSAGES.UNAUTHORIZED));
+        .json(formatResponse(false, null, "Neautorizovaný prístup"));
     }
 
     // Админы могут все
@@ -257,7 +257,7 @@ export const requireOwnerOrAdmin = (getResourceOwner) => {
             formatResponse(
               false,
               null,
-              "Доступ запрещен. Вы можете изменять только свой контент"
+              "Prístup zamietnutý. Môžete upravovať iba svoj obsah"
             )
           );
       }
@@ -268,7 +268,7 @@ export const requireOwnerOrAdmin = (getResourceOwner) => {
       return res
         .status(500)
         .json(
-          formatResponse(false, null, ERROR_MESSAGES.INTERNAL_SERVER_ERROR)
+          formatResponse(false, null, "Interná chyba servera")
         );
     }
   };

@@ -43,7 +43,7 @@ class UserController {
 
     const users = await userService.getUsers(options);
 
-    res.json(formatResponse(true, users, "Список пользователей получен"));
+    res.json(formatResponse(true, users, "Zoznam používateľov bol získaný"));
   });
 
   // Получение конкретного пользователя
@@ -53,7 +53,7 @@ class UserController {
     // Валидация ID
     if (!isValidObjectId(id)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID пользователя", {
+        formatResponse(false, null, "Nesprávny formát ID používateľa", {
           type: "VALIDATION_ERROR",
           field: "id",
         })
@@ -69,7 +69,9 @@ class UserController {
 
     const user = await userService.getUserById(id, req.user.role === "admin");
 
-    res.json(formatResponse(true, user, "Информация о пользователе получена"));
+    res.json(
+      formatResponse(true, user, "Informácie o používateľovi boli získané")
+    );
   });
 
   // Получение активности пользователя (вопросы, ответы, комментарии)
@@ -80,7 +82,7 @@ class UserController {
     // Валидация ID
     if (!isValidObjectId(id)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID пользователя", {
+        formatResponse(false, null, "Nesprávny formát ID používateľa", {
           type: "VALIDATION_ERROR",
           field: "id",
         })
@@ -98,7 +100,7 @@ class UserController {
     const activity = await userService.getUserActivity(id, options);
 
     res.json(
-      formatResponse(true, activity, "Активность пользователя получена")
+      formatResponse(true, activity, "Aktivita používateľa bola získaná")
     );
   });
 
@@ -110,7 +112,7 @@ class UserController {
     // Валидация ID
     if (!isValidObjectId(id)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID пользователя", {
+        formatResponse(false, null, "Nesprávny formát ID používateľa", {
           type: "VALIDATION_ERROR",
           field: "id",
         })
@@ -127,21 +129,16 @@ class UserController {
     // Валидация данных
     if (bio && bio.length > 500) {
       return res.status(400).json(
-        formatResponse(
-          false,
-          null,
-          "Биография не может превышать 500 символов",
-          {
-            type: "VALIDATION_ERROR",
-            field: "bio",
-          }
-        )
+        formatResponse(false, null, "Biografia nemôže presiahnuť 500 znakov", {
+          type: "VALIDATION_ERROR",
+          field: "bio",
+        })
       );
     }
 
     if (avatar && !avatar.match(/^https?:\/\/.+/)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат URL аватара", {
+        formatResponse(false, null, "Nesprávny formát URL pre avatar", {
           type: "VALIDATION_ERROR",
           field: "avatar",
         })
@@ -155,7 +152,7 @@ class UserController {
     if (Object.keys(updateData).length === 0) {
       return res
         .status(400)
-        .json(formatResponse(false, null, "Нет данных для обновления"));
+        .json(formatResponse(false, null, "Žiadne údaje na aktualizáciu"));
     }
 
     const updatedUser = await userService.updateProfile(
@@ -165,7 +162,11 @@ class UserController {
     );
 
     res.json(
-      formatResponse(true, updatedUser, SUCCESS_MESSAGES.PROFILE_UPDATED)
+      formatResponse(
+        true,
+        updatedUser,
+        SUCCESS_MESSAGES.PROFILE_UPDATED || "Profil bol aktualizovaný"
+      )
     );
   });
 
@@ -178,7 +179,7 @@ class UserController {
     // Валидация ID
     if (!isValidObjectId(id)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID пользователя", {
+        formatResponse(false, null, "Nesprávny formát ID používateľa", {
           type: "VALIDATION_ERROR",
           field: "id",
         })
@@ -188,7 +189,7 @@ class UserController {
     // Валидация роли
     if (!Object.values(USER_ROLES).includes(role)) {
       return res.status(400).json(
-        formatResponse(false, null, "Недопустимая роль пользователя", {
+        formatResponse(false, null, "Neplatná rola používateľa", {
           type: "VALIDATION_ERROR",
           field: "role",
           allowedValues: Object.values(USER_ROLES),
@@ -223,7 +224,13 @@ class UserController {
       );
     }
 
-    res.json(formatResponse(true, result, SUCCESS_MESSAGES.ROLE_CHANGED));
+    res.json(
+      formatResponse(
+        true,
+        result,
+        SUCCESS_MESSAGES.ROLE_CHANGED || "Rola používateľa bola zmenená"
+      )
+    );
   });
 
   // Бан пользователя (только админы)
@@ -235,7 +242,7 @@ class UserController {
     // Валидация ID
     if (!isValidObjectId(id)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID пользователя", {
+        formatResponse(false, null, "Nesprávny formát ID používateľa", {
           type: "VALIDATION_ERROR",
           field: "id",
         })
@@ -248,7 +255,7 @@ class UserController {
         formatResponse(
           false,
           null,
-          "Причина бана должна содержать минимум 10 символов",
+          "Dôvod blokovania musí obsahovať aspoň 10 znakov",
           {
             type: "VALIDATION_ERROR",
             field: "reason",
@@ -260,7 +267,7 @@ class UserController {
     // Нельзя банить самого себя
     if (id === adminId.toString()) {
       return res.status(400).json(
-        formatResponse(false, null, "Нельзя забанить самого себя", {
+        formatResponse(false, null, "Nemôžete zablokovať sami seba", {
           type: "SELF_BAN_FORBIDDEN",
         })
       );
@@ -301,7 +308,7 @@ class UserController {
       `Banned user ${id} for reason: ${reason.trim()}`
     );
 
-    res.json(formatResponse(true, bannedUser, "Пользователь заблокирован"));
+    res.json(formatResponse(true, bannedUser, "Používateľ bol zablokovaný"));
   });
 
   // Разбан пользователя (только админы)
@@ -312,7 +319,7 @@ class UserController {
     // Валидация ID
     if (!isValidObjectId(id)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID пользователя", {
+        formatResponse(false, null, "Nesprávny formát ID používateľa", {
           type: "VALIDATION_ERROR",
           field: "id",
         })
@@ -333,7 +340,7 @@ class UserController {
 
     logUserAction(adminId, "USER_UNBANNED", `Unbanned user ${id}`);
 
-    res.json(formatResponse(true, unbannedUser, "Пользователь разблокирован"));
+    res.json(formatResponse(true, unbannedUser, "Používateľ bol odblokovaný"));
   });
 
   // Поиск пользователей
@@ -347,7 +354,7 @@ class UserController {
         formatResponse(
           false,
           null,
-          "Поисковый запрос должен содержать минимум 2 символа",
+          "Vyhľadávací dotaz musí obsahovať aspoň 2 znaky",
           {
             type: "VALIDATION_ERROR",
             field: "query",
@@ -365,7 +372,11 @@ class UserController {
     const results = await userService.searchUsers(query.trim(), options);
 
     res.json(
-      formatResponse(true, results, "Результаты поиска пользователей получены")
+      formatResponse(
+        true,
+        results,
+        "Výsledky vyhľadávania používateľov boli získané"
+      )
     );
   });
 
@@ -374,7 +385,7 @@ class UserController {
     const statistics = await userService.getUserStatistics();
 
     res.json(
-      formatResponse(true, statistics, "Статистика пользователей получена")
+      formatResponse(true, statistics, "Štatistika používateľov bola získaná")
     );
   });
 
@@ -392,7 +403,9 @@ class UserController {
 
     const candidates = await roleService.getExpertCandidates(options);
 
-    res.json(formatResponse(true, candidates, "Кандидаты в эксперты получены"));
+    res.json(
+      formatResponse(true, candidates, "Kandidáti na expertov boli získaní")
+    );
   });
 
   // Массовое назначение роли эксперта (только админы)
@@ -402,7 +415,7 @@ class UserController {
 
     if (!Array.isArray(userIds) || userIds.length === 0) {
       return res.status(400).json(
-        formatResponse(false, null, "Список ID пользователей обязателен", {
+        formatResponse(false, null, "Zoznam ID používateľov je povinný", {
           type: "VALIDATION_ERROR",
           field: "userIds",
         })
@@ -411,7 +424,7 @@ class UserController {
 
     if (userIds.length > 20) {
       return res.status(400).json(
-        formatResponse(false, null, "Максимум 20 пользователей за раз", {
+        formatResponse(false, null, "Maximálne 20 používateľov naraz", {
           type: "VALIDATION_ERROR",
           field: "userIds",
         })
@@ -422,7 +435,7 @@ class UserController {
     for (const userId of userIds) {
       if (!isValidObjectId(userId)) {
         return res.status(400).json(
-          formatResponse(false, null, `Неверный формат ID: ${userId}`, {
+          formatResponse(false, null, `Nesprávny formát ID: ${userId}`, {
             type: "VALIDATION_ERROR",
             field: "userIds",
           })
@@ -440,7 +453,7 @@ class UserController {
       formatResponse(
         true,
         result,
-        `Массовое назначение завершено: ${result.summary.successful} успешно, ${result.summary.failed} ошибок`
+        `Hromadné povýšenie dokončené: ${result.summary.successful} úspešných, ${result.summary.failed} chýb`
       )
     );
   });
@@ -453,7 +466,7 @@ class UserController {
     // Валидация ID
     if (!isValidObjectId(id)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID пользователя", {
+        formatResponse(false, null, "Nesprávny formát ID používateľa", {
           type: "VALIDATION_ERROR",
           field: "id",
         })
@@ -463,7 +476,7 @@ class UserController {
     const options = { page, limit };
     const history = await roleService.getUserRoleHistory(id, options);
 
-    res.json(formatResponse(true, history, "История изменений ролей получена"));
+    res.json(formatResponse(true, history, "História zmien rolí bola získaná"));
   });
 }
 

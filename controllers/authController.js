@@ -61,7 +61,7 @@ class AuthController {
         formatResponse(
           true,
           { ...userInfo, token: internalToken },
-          "Токен успешно верифицирован"
+          "Token bol úspešne overený"
         )
       );
     } catch (error) {
@@ -74,9 +74,14 @@ class AuthController {
 
       if (error.message.includes("TOKEN_EXPIRED")) {
         return res.status(401).json(
-          formatResponse(false, null, "Токен истек. Необходимо войти заново", {
-            type: "TOKEN_EXPIRED",
-          })
+          formatResponse(
+            false,
+            null,
+            "Token vypršal. Je potrebné sa znova prihlásiť",
+            {
+              type: "TOKEN_EXPIRED",
+            }
+          )
         );
       }
 
@@ -103,7 +108,7 @@ class AuthController {
     // Валидация обязательных полей
     if (!email || !password || !firstName) {
       return res.status(400).json(
-        formatResponse(false, null, "Email, пароль и имя обязательны", {
+        formatResponse(false, null, "Email, heslo a meno sú povinné", {
           type: "VALIDATION_ERROR",
           fields: ["email", "password", "firstName"],
         })
@@ -113,7 +118,7 @@ class AuthController {
     // Проверка совпадения паролей
     if (password !== confirmPassword) {
       return res.status(400).json(
-        formatResponse(false, null, "Пароли не совпадают", {
+        formatResponse(false, null, "Heslá sa nezhodujú", {
           type: "VALIDATION_ERROR",
           field: "confirmPassword",
         })
@@ -123,15 +128,10 @@ class AuthController {
     // Валидация пароля
     if (password.length < 6) {
       return res.status(400).json(
-        formatResponse(
-          false,
-          null,
-          "Пароль должен содержать минимум 6 символов",
-          {
-            type: "VALIDATION_ERROR",
-            field: "password",
-          }
-        )
+        formatResponse(false, null, "Heslo musí obsahovať minimálne 6 znakov", {
+          type: "VALIDATION_ERROR",
+          field: "password",
+        })
       );
     }
 
@@ -139,7 +139,7 @@ class AuthController {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат email", {
+        formatResponse(false, null, "Nesprávny formát emailu", {
           type: "VALIDATION_ERROR",
           field: "email",
         })
@@ -155,7 +155,7 @@ class AuthController {
         formatResponse(
           false,
           null,
-          "Username должен содержать минимум 3 символа (буквы, цифры, _)",
+          "Používateľské meno musí obsahovať minimálne 3 znaky (písmená, čísla, _)",
           {
             type: "VALIDATION_ERROR",
             field: "username",
@@ -175,27 +175,6 @@ class AuthController {
         },
         requestIP
       );
-
-      // // Отправляем email с кодом если код создался
-      // if (result.verificationSent && result.devCode) {
-      //   try {
-      //     await emailService.sendEmail(
-      //       email,
-      //       "forumVerification",
-      //       "Fastcredit.sk",
-      //       { code: result.devCode }
-      //     );
-
-      //     logUserAction(
-      //       result.user._id,
-      //       "VERIFICATION_EMAIL_SENT",
-      //       `Verification email sent to ${email}`
-      //     );
-      //   } catch (emailError) {
-      //     console.error("Failed to send verification email:", emailError);
-      //     // Не блокируем регистрацию если email не отправился
-      //   }
-      // }
 
       res.status(201).json(
         formatResponse(
@@ -233,7 +212,7 @@ class AuthController {
     // Валидация обязательных полей
     if (!login || !password) {
       return res.status(400).json(
-        formatResponse(false, null, "Логин и пароль обязательны", {
+        formatResponse(false, null, "Prihlasovacie meno a heslo sú povinné", {
           type: "VALIDATION_ERROR",
           fields: ["login", "password"],
         })
@@ -246,7 +225,7 @@ class AuthController {
       // Проверяем подтверждение email для локальных пользователей
       if (result.user.provider === "local" && !result.user.isEmailVerified) {
         return res.status(403).json(
-          formatResponse(false, null, "Необходимо подтвердить email", {
+          formatResponse(false, null, "Je potrebné potvrdiť email", {
             type: "EMAIL_NOT_VERIFIED",
             userId: result.user._id,
             email: result.user.email,
@@ -270,7 +249,7 @@ class AuthController {
             ...userInfo,
             token: result.token,
           },
-          "Успешный вход в систему"
+          "Úspešné prihlásenie do systému"
         )
       );
     } catch (error) {
@@ -311,7 +290,7 @@ class AuthController {
 
     if (!email) {
       return res.status(400).json(
-        formatResponse(false, null, "Email обязателен", {
+        formatResponse(false, null, "Email je povinný", {
           type: "VALIDATION_ERROR",
           field: "email",
         })
@@ -322,7 +301,7 @@ class AuthController {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат email", {
+        formatResponse(false, null, "Nesprávny formát emailu", {
           type: "VALIDATION_ERROR",
           field: "email",
         })
@@ -397,7 +376,7 @@ class AuthController {
 
     if (!email || !code) {
       return res.status(400).json(
-        formatResponse(false, null, "Email и код подтверждения обязательны", {
+        formatResponse(false, null, "Email a overovací kód sú povinné", {
           type: "VALIDATION_ERROR",
           fields: ["email", "code"],
         })
@@ -407,7 +386,7 @@ class AuthController {
     // Валидация кода (должен быть 6 цифр)
     if (!/^[0-9]{6}$/.test(code)) {
       return res.status(400).json(
-        formatResponse(false, null, "Код должен состоять из 6 цифр", {
+        formatResponse(false, null, "Kód musí obsahovať 6 číslic", {
           type: "VALIDATION_ERROR",
           field: "code",
         })
@@ -457,7 +436,7 @@ class AuthController {
             token,
             emailVerified: true,
           },
-          "Email успешно подтвержден. Добро пожаловать!"
+          "Email bol úspešne overený. Vitajte!"
         )
       );
     } catch (error) {
@@ -482,7 +461,7 @@ class AuthController {
 
     if (!email) {
       return res.status(400).json(
-        formatResponse(false, null, "Email обязателен", {
+        formatResponse(false, null, "Email je povinný", {
           type: "VALIDATION_ERROR",
           field: "email",
         })
@@ -493,7 +472,7 @@ class AuthController {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат email", {
+        formatResponse(false, null, "Nesprávny formát emailu", {
           type: "VALIDATION_ERROR",
           field: "email",
         })
@@ -537,7 +516,7 @@ class AuthController {
 
     if (!email || !code) {
       return res.status(400).json(
-        formatResponse(false, null, "Email и код обязательны", {
+        formatResponse(false, null, "Email a kód sú povinné", {
           type: "VALIDATION_ERROR",
           fields: ["email", "code"],
         })
@@ -547,7 +526,7 @@ class AuthController {
     // Валидация кода
     if (!/^[0-9]{6}$/.test(code)) {
       return res.status(400).json(
-        formatResponse(false, null, "Код должен состоять из 6 цифр", {
+        formatResponse(false, null, "Kód musí obsahovať 6 číslic", {
           type: "VALIDATION_ERROR",
           field: "code",
         })
@@ -599,7 +578,7 @@ class AuthController {
 
     if (!email || !code || !newPassword || !confirmPassword) {
       return res.status(400).json(
-        formatResponse(false, null, "Все поля обязательны", {
+        formatResponse(false, null, "Všetky polia sú povinné", {
           type: "VALIDATION_ERROR",
           fields: ["email", "code", "newPassword", "confirmPassword"],
         })
@@ -609,7 +588,7 @@ class AuthController {
     // Проверка совпадения паролей
     if (newPassword !== confirmPassword) {
       return res.status(400).json(
-        formatResponse(false, null, "Пароли не совпадают", {
+        formatResponse(false, null, "Heslá sa nezhodujú", {
           type: "VALIDATION_ERROR",
           field: "confirmPassword",
         })
@@ -619,15 +598,10 @@ class AuthController {
     // Валидация пароля
     if (newPassword.length < 6) {
       return res.status(400).json(
-        formatResponse(
-          false,
-          null,
-          "Пароль должен содержать минимум 6 символов",
-          {
-            type: "VALIDATION_ERROR",
-            field: "newPassword",
-          }
-        )
+        formatResponse(false, null, "Heslo musí obsahovať minimálne 6 znakov", {
+          type: "VALIDATION_ERROR",
+          field: "newPassword",
+        })
       );
     }
 
@@ -669,12 +643,16 @@ class AuthController {
       const userInfo = await authService.getUserInfo(req.user._id);
 
       res.json(
-        formatResponse(true, userInfo, "Информация о пользователе получена")
+        formatResponse(
+          true,
+          userInfo,
+          "Informácie o používateľovi boli získané"
+        )
       );
     } catch (error) {
       if (error.message === "USER_NOT_FOUND") {
         return res.status(404).json(
-          formatResponse(false, null, "Пользователь не найден", {
+          formatResponse(false, null, "Používateľ nebol nájdený", {
             type: "USER_NOT_FOUND",
           })
         );
@@ -694,7 +672,9 @@ class AuthController {
         bio,
       });
 
-      res.json(formatResponse(true, updatedUser, "Профиль успешно обновлен"));
+      res.json(
+        formatResponse(true, updatedUser, "Profil bol úspešne aktualizovaný")
+      );
     } catch (error) {
       if (error.message.includes("не найден")) {
         return res.status(404).json(
@@ -739,7 +719,7 @@ class AuthController {
             isLocked: user.isAccountLocked(),
           },
         },
-        "Права доступа получены"
+        "Prístupové práva boli získané"
       )
     );
   });
@@ -753,7 +733,7 @@ class AuthController {
         `User logged out: ${req.user.email}`
       );
 
-      res.json(formatResponse(true, null, "Выход выполнен успешно"));
+      res.json(formatResponse(true, null, "Odhlásenie bolo úspešné"));
     } catch (error) {
       throw error;
     }
@@ -775,7 +755,7 @@ class AuthController {
             users: userStats,
             verificationCodes: verificationStats,
           },
-          "Статистика аутентификации получена"
+          "Štatistika autentifikácie bola získaná"
         )
       );
     } catch (error) {
@@ -808,7 +788,7 @@ class AuthController {
           },
           supportedMethods: ["google", "local"],
         },
-        "Auth service работает нормально"
+        "Auth služba funguje normálne"
       )
     );
   });

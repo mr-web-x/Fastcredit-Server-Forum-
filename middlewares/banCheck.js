@@ -23,7 +23,7 @@ export const checkUserBan = (req, res, next) => {
       formatResponse(
         false,
         null,
-        "Аккаунт деактивирован. Обратитесь к администратору.",
+        "Účet je deaktivovaný. Kontaktujte administrátora.",
         {
           type: "ACCOUNT_DEACTIVATED",
           userId: req.user._id,
@@ -43,7 +43,7 @@ export const checkUserBan = (req, res, next) => {
 
     let banMessage;
     if (banInfo.isPermanent) {
-      banMessage = `Аккаунт заблокирован навсегда. Причина: ${banInfo.reason}`;
+      banMessage = `Účet je natrvalo zablokovaný. Dôvod: ${banInfo.reason}`;
     } else {
       const until = banInfo.bannedUntil.toLocaleDateString("sk-SK", {
         year: "numeric",
@@ -52,7 +52,7 @@ export const checkUserBan = (req, res, next) => {
         hour: "2-digit",
         minute: "2-digit",
       });
-      banMessage = `Аккаунт заблокирован до ${until}. Причина: ${banInfo.reason}`;
+      banMessage = `Účet je zablokovaný do ${until}. Dôvod: ${banInfo.reason}`;
     }
 
     logSecurityEvent(
@@ -83,11 +83,11 @@ export const checkUserCanPerformAction = (req, res, next) => {
 
   if (!req.user.canAccessFeatures()) {
     const reason = !req.user.isActive
-      ? "Аккаунт деактивирован"
-      : "Аккаунт заблокирован";
+      ? "Účet je deaktivovaný"
+      : "Účet je zablokovaný";
 
     return res.status(403).json(
-      formatResponse(false, null, `${reason}. Действие запрещено.`, {
+      formatResponse(false, null, `${reason}. Akcia je zakázaná.`, {
         type: "ACTION_FORBIDDEN",
         isActive: req.user.isActive,
         isBanned: req.user.isBanned,
@@ -110,13 +110,13 @@ export const checkUserCanAnswer = (req, res, next) => {
   if (!req.user.canAnswer) {
     let message;
     if (!req.user.isExpert) {
-      message = "Только эксперты могут отвечать на вопросы";
+      message = "Odpovedať na otázky môžu iba experti";
     } else if (!req.user.isActive) {
-      message = "Аккаунт деактивирован";
+      message = "Účet je deaktivovaný";
     } else if (req.user.isBannedCurrently()) {
-      message = "Аккаунт заблокирован";
+      message = "Účet je zablokovaný";
     } else {
-      message = "Недостаточно прав для ответа на вопросы";
+      message = "Nemáte dostatočné oprávnenia na odpovedanie na otázky";
     }
 
     return res.status(403).json(
@@ -140,17 +140,16 @@ export const checkUserCanModerate = (req, res, next) => {
       .json(formatResponse(false, null, ERROR_MESSAGES.UNAUTHORIZED));
   }
 
-
   if (!req.user.canModerate) {
     let message;
     if (!req.user.isAdmin) {
-      message = "Только администраторы могут модерировать контент";
+      message = "Obsah môžu moderovať iba administrátori";
     } else if (!req.user.isActive) {
-      message = "Аккаунт деактивирован";
+      message = "Účet je deaktivovaný";
     } else if (req.user.isBannedCurrently()) {
-      message = "Аккаунт заблокирован";
+      message = "Účet je zablokovaný";
     } else {
-      message = "Недостаточно прав для модерации";
+      message = "Nemáte dostatočné oprávnenia na moderovanie";
     }
 
     return res.status(403).json(

@@ -15,7 +15,7 @@ class UserService {
       const selectFields = includePrivate ? "" : "-__v";
       const resultUser = await User.findById(userId).select(selectFields);
 
-      if (!resultUser) throw new Error("User not found");
+      if (!resultUser) throw new Error("Používateľ nebol nájdený");
 
       await cryptoService.smartDecrypt(resultUser);
       return resultUser;
@@ -163,7 +163,7 @@ class UserService {
   async updateProfile(userId, updateData, updatedBy = null) {
     try {
       const resultUser = await User.findById(userId);
-      if (!resultUser) throw new Error("User not found");
+      if (!resultUser) throw new Error("Používateľ nebol nájdený");
 
       const userAllowedFields = ["bio", "avatar", "firstName", "lastName"];
       const adminOnlyFields = [
@@ -198,13 +198,13 @@ class UserService {
             username: updateData.username,
             _id: { $ne: userId },
           });
-          if (usernameExists) throw new Error("Username already taken");
+          if (usernameExists) throw new Error("Používateľské meno je už obsadené");
           filteredData.username = updateData.username;
         }
       }
 
       if (Object.keys(filteredData).length === 0) {
-        throw new Error("No valid fields to update");
+        throw new Error("Žiadne platné polia na aktualizáciu");
       }
 
       const updatedUser = await User.findByIdAndUpdate(userId, filteredData, {
@@ -234,7 +234,7 @@ class UserService {
       const skip = (page - 1) * limit;
 
       const resultUser = await User.findById(userId);
-      if (!resultUser) throw new Error("User not found");
+      if (!resultUser) throw new Error("Používateľ nebol nájdený");
 
       await cryptoService.smartDecrypt(resultUser);
 

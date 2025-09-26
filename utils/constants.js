@@ -132,52 +132,51 @@ export const CONTENT_LIMITS = {
   COMMENT_CONTENT_MAX: 1000,
   BIO_MAX: 500,
 };
-
-// Сообщения об ошибках
+// Chybové správy
 export const ERROR_MESSAGES = {
   // Auth
-  UNAUTHORIZED: "Необходима авторизация",
-  FORBIDDEN: "Недостаточно прав доступа",
-  INVALID_TOKEN: "Недействительный токен",
-  USER_BANNED: "Пользователь заблокирован",
+  UNAUTHORIZED: "Vyžaduje sa autorizácia",
+  FORBIDDEN: "Nedostatočné oprávnenia",
+  INVALID_TOKEN: "Neplatný token",
+  USER_BANNED: "Používateľ je zablokovaný",
 
   // Validation
-  VALIDATION_ERROR: "Ошибка валидации данных",
-  REQUIRED_FIELD: "Обязательное поле",
-  INVALID_FORMAT: "Неверный формат данных",
+  VALIDATION_ERROR: "Chyba validácie údajov",
+  REQUIRED_FIELD: "Povinné pole",
+  INVALID_FORMAT: "Nesprávny formát údajov",
 
   // Rate Limiting
-  RATE_LIMIT_EXCEEDED: "Превышен лимит запросов. Попробуйте позже",
+  RATE_LIMIT_EXCEEDED: "Prekročený limit požiadaviek. Skúste neskôr",
 
   // Not Found
-  USER_NOT_FOUND: "Пользователь не найден",
-  QUESTION_NOT_FOUND: "Вопрос не найден",
-  ANSWER_NOT_FOUND: "Ответ не найден",
-  COMMENT_NOT_FOUND: "Комментарий не найден",
+  USER_NOT_FOUND: "Používateľ nenájdený",
+  QUESTION_NOT_FOUND: "Otázka nenájdená",
+  ANSWER_NOT_FOUND: "Odpoveď nenájdená",
+  COMMENT_NOT_FOUND: "Komentár nenájdený",
 
   // Business Logic
-  QUESTION_ALREADY_ANSWERED: "На вопрос уже получен ответ",
-  CANNOT_ANSWER_OWN_QUESTION: "Нельзя отвечать на свой вопрос",
-  ANSWER_ALREADY_ACCEPTED: "Ответ уже принят",
-  ALREADY_LIKED: "Вы уже поставили лайк",
+  QUESTION_ALREADY_ANSWERED: "Otázka už bola zodpovedaná",
+  CANNOT_ANSWER_OWN_QUESTION: "Nemôžete odpovedať na vlastnú otázku",
+  ANSWER_ALREADY_ACCEPTED: "Odpoveď už bola prijatá",
+  ALREADY_LIKED: "Už ste dali like",
 
   // Server
-  INTERNAL_SERVER_ERROR: "Внутренняя ошибка сервера",
-  DATABASE_ERROR: "Ошибка базы данных",
+  INTERNAL_SERVER_ERROR: "Interná chyba servera",
+  DATABASE_ERROR: "Chyba databázy",
 };
 
-// Сообщения об успехе
+// Správy o úspechu
 export const SUCCESS_MESSAGES = {
-  QUESTION_CREATED: "Вопрос успешно создан",
-  ANSWER_CREATED: "Ответ успешно создан",
-  COMMENT_CREATED: "Комментарий успешно создан",
-  LIKE_ADDED: "Лайк добавлен",
-  LIKE_REMOVED: "Лайк убран",
-  ROLE_CHANGED: "Роль пользователя изменена",
-  USER_BANNED: "Пользователь заблокирован",
-  USER_UNBANNED: "Пользователь разблокирован",
-  CONTENT_APPROVED: "Контент одобрен",
-  CONTENT_REJECTED: "Контент отклонен",
+  QUESTION_CREATED: "Otázka bola úspešne vytvorená",
+  ANSWER_CREATED: "Odpoveď bola úspešne vytvorená",
+  COMMENT_CREATED: "Komentár bol úspešne vytvorený",
+  LIKE_ADDED: "Like bol pridaný",
+  LIKE_REMOVED: "Like bol odstránený",
+  ROLE_CHANGED: "Rola používateľa bola zmenená",
+  USER_BANNED: "Používateľ bol zablokovaný",
+  USER_UNBANNED: "Používateľ bol odblokovaný",
+  CONTENT_APPROVED: "Obsah bol schválený",
+  CONTENT_REJECTED: "Obsah bol zamietnutý",
 };
 
 export default {
