@@ -4,6 +4,7 @@ import Question from "../models/Question.js";
 import User from "../models/User.js";
 import { logUserAction, logError } from "../middlewares/logger.js";
 import { createPaginationResponse } from "../utils/helpers.js";
+import cryptoService from "./cryptoService.js";
 
 class CommentService {
   // Создание комментария к вопросу
@@ -178,10 +179,14 @@ class CommentService {
 
       logUserAction(userId, "COMMENT_UPDATED", `Updated comment ${commentId}`);
 
-      return await Comment.findById(commentId).populate(
+      const resultComment = await Comment.findById(commentId).populate(
         "author",
-        "email role avatar"
+        "originalEmail role avatar"
       );
+
+      await cryptoService.smartDecrypt(resultComment);
+
+      return resultComment;
     } catch (error) {
       logError(error, "CommentService.updateComment", userId);
       throw error;
@@ -243,9 +248,13 @@ class CommentService {
         `${action.toLowerCase()} comment ${commentId}`
       );
 
-      return await Comment.findById(commentId)
-        .populate("author", "firstName lastName email role avatar")
-        .populate("moderatedBy", "email role");
+      const resultComment = await Comment.findById(commentId)
+        .populate("author", "firstName lastName originalEmail role avatar")
+        .populate("moderatedBy", "originalEmail role");
+
+      await cryptoService.smartDecrypt(resultComment);
+
+      return resultComment;
     } catch (error) {
       logError(error, "CommentService.moderateComment", moderatorId);
       throw error;

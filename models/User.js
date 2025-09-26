@@ -2,6 +2,8 @@
 import mongoose from "mongoose";
 import { USER_ROLES } from "../utils/constants.js";
 import { hashPassword, generateSecureToken } from "../utils/security.js";
+import EncryptableService from "../services/encryptableService.js";
+import cryptoService from "../services/cryptoService.js";
 
 const userSchema = new mongoose.Schema(
   {
@@ -27,6 +29,11 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
       index: true,
+    },
+
+    originalEmail: {
+      type: String, // зашифрованный e-mail
+      required: true, // скрываем по умолчанию
     },
 
     // Опциональный username для локальной авторизации
@@ -141,11 +148,11 @@ userSchema.virtual("fullName").get(function () {
     return `${this.firstName} ${this.lastName}`;
   if (this.firstName) return this.firstName;
   if (this.lastName) return this.lastName;
-  return this.email;
+  return this.originalEmail;
 });
 
 userSchema.virtual("displayName").get(function () {
-  return this.username || this.fullName || this.email;
+  return this.username || this.fullName || this.originalEmail;
 });
 
 userSchema.virtual("isTemporarilyBanned").get(function () {
@@ -250,14 +257,18 @@ userSchema.statics.findByRole = function (role) {
 };
 
 // Поиск для локальной авторизации
-userSchema.statics.findByEmailOrUsername = function (
+userSchema.statics.findByEmailOrUsername = async function (
   login,
   includePassword = false
 ) {
+  // хэшируем login
+  const hashedEmail = await cryptoService.hashData(login.toLowerCase());
+
   const query = this.findOne({
-    $or: [{ email: login.toLowerCase() }, { username: login }],
+    $or: [{ email: hashedEmail }, { username: login }],
     provider: "local",
   });
+
   if (includePassword) query.select("+password");
   return query;
 };
@@ -294,6 +305,12 @@ userSchema.pre("save", async function (next) {
     this.password = await hashPassword(this.password);
   }
 
+  // Если изменился originalEmail
+  if (this.isModified("originalEmail")) {
+    // email хранится в виде хэша для поиска
+    this.email = await cryptoService.hashData(this.originalEmail.toLowerCase());
+  }
+
   // Отслеживаем смену роли
   if (this.isModified("role")) {
     this.roleChangedAt = new Date();
@@ -318,6 +335,12 @@ userSchema.post("save", function (doc) {
     console.log(`User role changed: ${doc.email} -> ${doc.role}`);
   }
 });
+
+EncryptableService.applyEncryption(userSchema, [
+  "originalEmail",
+  "firstName",
+  "lastName",
+]);
 
 const User = mongoose.model("User", userSchema);
 export default User;

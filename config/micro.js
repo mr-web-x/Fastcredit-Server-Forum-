@@ -10,4 +10,8 @@ export const microServices = {
     xApiKey: process.env.TG_SERVICE_X_API_KEY,
     baseUrl: "https://telegram.walletroom.online",
   },
+  crypto: {
+    xApiKey: process.env.CRYPTO_SERVICE_X_API_KEY,
+    baseUrl: "http://127.0.0.1:5008",
+  },
 };

@@ -5,6 +5,22 @@ export const USER_ROLES = {
   ADMIN: "admin",
 };
 
+// Social media
+export const SOCIAL_PLATFORMS = {
+  FACEBOOK: "facebook",
+  LINKEDIN: "linkedin",
+};
+
+// Social actions
+export const ANSWER_ACTIONS = {
+  CREATE: "create", // Створення відповіді
+  UPDATE: "update", // Редагування змісту
+  APPROVE: "approve", // Схвалення
+  REJECT: "reject", // Відхилення
+  SOCIAL_PUBLISH: "social_publish", // Публікація в соцмережі
+  SOCIAL_DELETE: "social_delete", // Видалення з соцмережі
+};
+
 // Статусы вопросов
 export const QUESTION_STATUS = {
   PENDING: "pending",

@@ -11,6 +11,7 @@ import {
 } from "../middlewares/logger.js";
 import { OAuth2Client } from "google-auth-library";
 import { USER_ROLES } from "../utils/constants.js";
+import cryptoService from "../services/cryptoService.js";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -75,9 +76,12 @@ class AuthService {
         });
 
         if (!user) {
+          const hashedEmail = await cryptoService.hashData(
+            tokenData.data.email
+          );
           // Проверяем существование пользователя с таким же email
           const existingUser = await User.findOne({
-            email: tokenData.data.email,
+            email: hashedEmail,
           });
 
           if (existingUser) {
@@ -87,7 +91,8 @@ class AuthService {
           // Создаем нового Google пользователя
           user = await User.create({
             googleId: tokenData.data.userId,
-            email: tokenData.data.email,
+            email: hashedEmail,
+            originalEmail: tokenData.data.email,
             firstName: tokenData.data.firstName,
             lastName: tokenData.data.lastName,
             avatar: tokenData.data.avatar,
@@ -212,6 +217,7 @@ class AuthService {
   async getUserInfo(userId) {
     try {
       const user = await User.findById(userId).select("-__v");
+      await cryptoService.smartDecrypt(user);
 
       if (!user) {
         throw new Error("USER_NOT_FOUND");
@@ -219,7 +225,7 @@ class AuthService {
 
       return {
         id: user._id,
-        email: user.email,
+        email: user.originalEmail,
         username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -251,8 +257,10 @@ class AuthService {
     try {
       const { email, password, firstName, lastName, username } = userData;
 
+      const hashedEmail = await cryptoService.hashData(email);
+
       // Проверяем существование пользователя с таким email
-      const existingEmailUser = await User.findOne({ email });
+      const existingEmailUser = await User.findOne({ email: hashedEmail });
       if (existingEmailUser) {
         throw new Error("EMAIL_EXISTS");
       }
@@ -267,7 +275,8 @@ class AuthService {
 
       // Создаем пользователя
       const user = await User.create({
-        email,
+        email: hashedEmail,
+        originalEmail: email,
         password, // автоматически хешируется в pre-save middleware
         firstName,
         lastName,
@@ -356,7 +365,8 @@ class AuthService {
         logSecurityEvent(
           "LOGIN_BLOCKED",
           `Login attempt on locked account: ${user.email}`,
-          user._id
+          user._id,
+          lockTimeLeft
         );
         throw new Error("ACCOUNT_LOCKED");
       }
@@ -495,7 +505,8 @@ class AuthService {
   // Проверка доступности email
   async checkEmailAvailability(email) {
     try {
-      const existingUser = await User.findOne({ email });
+      const hashedEmail = await cryptoService.hashData(email);
+      const existingUser = await User.findOne({ email: hashedEmail });
       return {
         available: !existingUser,
         message: existingUser ? "Email уже занят" : "Email доступен",

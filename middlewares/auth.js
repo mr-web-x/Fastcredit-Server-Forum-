@@ -5,6 +5,7 @@ import User from "../models/User.js";
 import { formatResponse } from "../utils/helpers.js";
 import { ERROR_MESSAGES } from "../utils/constants.js";
 import { logSecurityEvent } from "./logger.js";
+import cryptoService from "../services/cryptoService.js";
 
 // Извлечение токена из заголовка Authorization
 const extractToken = (req) => {
@@ -73,6 +74,8 @@ export const authenticate = async (req, res, next) => {
     const user = await User.findById(decoded.userId || decoded.id).select(
       "-__v"
     );
+
+    await cryptoService.smartDecrypt(user);
 
     if (!user) {
       logSecurityEvent(
@@ -158,6 +161,7 @@ export const optionalAuth = async (req, res, next) => {
     const user = await User.findById(decoded.userId || decoded.id).select(
       "-__v"
     );
+    await cryptoService.smartDecrypt(user);
 
     if (user && user.isActive && !user.isBannedCurrently()) {
       req.user = user;

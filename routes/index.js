@@ -10,6 +10,7 @@ import userRoutes from "./users.js";
 import expertRoutes from "./experts.js";
 import adminRoutes from "./admin.js";
 import reportRoutes from "./reports.js";
+import testRoutes from "./test.js";
 
 const router = express.Router();
 
@@ -22,6 +23,10 @@ router.use("/users", userRoutes);
 router.use("/experts", expertRoutes);
 router.use("/admin", adminRoutes);
 router.use("/reports", reportRoutes);
+router.use("/test", testRoutes);
+
+// if (process.env.NODE_ENV === "development") {
+// }
 
 // API информация
 router.get("/", (req, res) => {

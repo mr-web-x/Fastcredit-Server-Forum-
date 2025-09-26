@@ -351,8 +351,8 @@ class AuthController {
       try {
         await emailService.sendEmail(
           email,
-          "forumVerification",
-          "Fastcredit.sk",
+          "code",
+          "FastCredit",
           { code: codeResult.devCode || "XXXXXX" } // В production будет настоящий код
         );
 
@@ -440,6 +440,8 @@ class AuthController {
       const user = result.user;
       const token = authService.generateInternalToken({ _id: user.id });
       const userInfo = await authService.getUserInfo(user.id);
+
+      await emailService.sendEmail(email, "welcome", "FastCredit", { code: 1 });
 
       logUserAction(
         user.id,

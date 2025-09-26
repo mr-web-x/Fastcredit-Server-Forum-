@@ -19,7 +19,7 @@ class AnswerController {
     // Валидация questionId
     if (!isValidObjectId(questionId)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID вопроса", {
+        formatResponse(false, null, "Neplatný formát ID otázky", {
           type: "VALIDATION_ERROR",
           field: "questionId",
         })
@@ -42,7 +42,7 @@ class AnswerController {
       options
     );
 
-    res.json(formatResponse(true, answers, "Ответы на вопрос получены"));
+    res.json(formatResponse(true, answers, "Odpovede na otázku boli prijaté"));
   });
 
   // Создание ответа на вопрос (только эксперты)
@@ -54,7 +54,7 @@ class AnswerController {
     // Валидация questionId
     if (!isValidObjectId(questionId)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID вопроса", {
+        formatResponse(false, null, "Neplatný formát ID otázky", {
           type: "VALIDATION_ERROR",
           field: "questionId",
         })
@@ -64,15 +64,10 @@ class AnswerController {
     // Дополнительная валидация контента
     if (!content || content.trim().length < 50) {
       return res.status(400).json(
-        formatResponse(
-          false,
-          null,
-          "Ответ должен содержать минимум 50 символов",
-          {
-            type: "VALIDATION_ERROR",
-            field: "content",
-          }
-        )
+        formatResponse(false, null, "Odpoveď musí obsahovať aspoň 50 znakov", {
+          type: "VALIDATION_ERROR",
+          field: "content",
+        })
       );
     }
 
@@ -81,7 +76,7 @@ class AnswerController {
         formatResponse(
           false,
           null,
-          "Ответ должен содержать максимум 10000 символов",
+          "Odpoveď môže obsahovať maximálne 10000 znakov",
           {
             type: "VALIDATION_ERROR",
             field: "content",
@@ -102,7 +97,7 @@ class AnswerController {
       await notificationService.notifyQuestionAuthorAboutAnswer(answer._id);
     } catch (notificationError) {
       console.warn(
-        "Failed to notify question author:",
+        "Nepodarilo sa upozorniť autora otázky:",
         notificationError.message
       );
     }
@@ -134,7 +129,7 @@ class AnswerController {
 
     const answers = await answerService.getExpertAnswers(expertId, options);
 
-    res.json(formatResponse(true, answers, "Ответы эксперта получены"));
+    res.json(formatResponse(true, answers, "Odpovede experta boli prijaté"));
   });
 
   // Обновление ответа
@@ -145,15 +140,10 @@ class AnswerController {
 
     if (!content || content.trim().length < 50) {
       return res.status(400).json(
-        formatResponse(
-          false,
-          null,
-          "Ответ должен содержать минимум 50 символов",
-          {
-            type: "VALIDATION_ERROR",
-            field: "content",
-          }
-        )
+        formatResponse(false, null, "Odpoveď musí obsahovať aspoň 50 znakov", {
+          type: "VALIDATION_ERROR",
+          field: "content",
+        })
       );
     }
 
@@ -167,7 +157,9 @@ class AnswerController {
       userId
     );
 
-    res.json(formatResponse(true, updatedAnswer, "Ответ успешно обновлен"));
+    res.json(
+      formatResponse(true, updatedAnswer, "Odpoveď bola úspešne aktualizovaná")
+    );
   });
 
   // Удаление ответа
@@ -177,7 +169,7 @@ class AnswerController {
 
     await answerService.deleteAnswer(id, userId);
 
-    res.json(formatResponse(true, null, "Ответ успешно удален"));
+    res.json(formatResponse(true, null, "Odpoveď bola úspešne odstránená"));
   });
 
   // Модерация ответа (только админы)
@@ -188,10 +180,15 @@ class AnswerController {
 
     if (typeof isApproved !== "boolean") {
       return res.status(400).json(
-        formatResponse(false, null, "Параметр isApproved должен быть boolean", {
-          type: "VALIDATION_ERROR",
-          field: "isApproved",
-        })
+        formatResponse(
+          false,
+          null,
+          "Parameter isApproved musí byť typu boolean",
+          {
+            type: "VALIDATION_ERROR",
+            field: "isApproved",
+          }
+        )
       );
     }
 
@@ -207,13 +204,13 @@ class AnswerController {
       await notificationService.notifyExpertAboutAnswerApproval(id, isApproved);
     } catch (notificationError) {
       console.warn(
-        "Failed to notify expert about moderation:",
+        "Nepodarilo sa upozorniť experta o moderácii:",
         notificationError.message
       );
     }
 
-    const action = isApproved ? "одобрен" : "отклонен";
-    res.json(formatResponse(true, moderatedAnswer, `Ответ ${action}`));
+    const action = isApproved ? "schválená" : "zamietnutá";
+    res.json(formatResponse(true, moderatedAnswer, `Odpoveď bola ${action}`));
   });
 
   // Принятие ответа как лучшего (только автор вопроса)
@@ -228,12 +225,14 @@ class AnswerController {
       await notificationService.notifyExpertAboutAnswerAcceptance(id);
     } catch (notificationError) {
       console.warn(
-        "Failed to notify expert about acceptance:",
+        "Nepodarilo sa upozorniť experta o prijatí odpovede:",
         notificationError.message
       );
     }
 
-    res.json(formatResponse(true, acceptedAnswer, "Ответ принят как лучший"));
+    res.json(
+      formatResponse(true, acceptedAnswer, "Odpoveď bola prijatá ako najlepšia")
+    );
   });
 
   // Лайк/дизлайк ответа
@@ -247,8 +246,8 @@ class AnswerController {
 
     logUserAction(
       userId,
-      result.action === "added" ? "ANSWER_LIKED" : "ANSWER_UNLIKED",
-      `${result.action} like for answer ${id}`
+      result.action === "added" ? "ODPOVEĎ_LIKED" : "ODPOVEĎ_UNLIKED",
+      `${result.action} like pre odpoveď ${id}`
     );
 
     res.json(
@@ -273,7 +272,7 @@ class AnswerController {
     const pendingAnswers = await answerService.getPendingAnswers(options);
 
     res.json(
-      formatResponse(true, pendingAnswers, "Ответы на модерации получены")
+      formatResponse(true, pendingAnswers, "Odpovede na moderácii boli prijaté")
     );
   });
 
@@ -281,7 +280,9 @@ class AnswerController {
   getAnswerStatistics = asyncHandler(async (req, res) => {
     const statistics = await answerService.getAnswerStatistics();
 
-    res.json(formatResponse(true, statistics, "Статистика ответов получена"));
+    res.json(
+      formatResponse(true, statistics, "Štatistika odpovedí bola získaná")
+    );
   });
 
   // Получение лучших ответов эксперта
@@ -295,7 +296,11 @@ class AnswerController {
     );
 
     res.json(
-      formatResponse(true, bestAnswers, "Лучшие ответы эксперта получены")
+      formatResponse(
+        true,
+        bestAnswers,
+        "Najlepšie odpovede experta boli získané"
+      )
     );
   });
 
@@ -306,7 +311,7 @@ class AnswerController {
 
     if (!Array.isArray(answerIds) || answerIds.length === 0) {
       return res.status(400).json(
-        formatResponse(false, null, "Список ID ответов обязателен", {
+        formatResponse(false, null, "Zoznam ID odpovedí je povinný", {
           type: "VALIDATION_ERROR",
           field: "answerIds",
         })
@@ -315,7 +320,7 @@ class AnswerController {
 
     if (answerIds.length > 50) {
       return res.status(400).json(
-        formatResponse(false, null, "Максимум 50 ответов за раз", {
+        formatResponse(false, null, "Maximálne 50 odpovedí naraz", {
           type: "VALIDATION_ERROR",
           field: "answerIds",
         })
@@ -345,7 +350,7 @@ class AnswerController {
     logUserAction(
       moderatorId,
       "BULK_ANSWER_MODERATION",
-      `Moderated ${successCount} answers (${errorCount} errors)`
+      `Moderovaných ${successCount} odpovedí (${errorCount} chýb)`
     );
 
     res.json(
@@ -359,10 +364,8 @@ class AnswerController {
             errors: errorCount,
           },
         },
-        `Массовая модерация завершена: ${successCount} успешно, ${errorCount} ошибок`
+        `Hromadná moderácia dokončená: ${successCount} úspešne, ${errorCount} chýb`
       )
     );
   });
 }
-
-export default new AnswerController();

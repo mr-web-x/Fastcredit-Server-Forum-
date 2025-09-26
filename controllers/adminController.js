@@ -81,9 +81,7 @@ class AdminController {
       },
     };
 
-    res.json(
-      formatResponse(true, dashboardData, "Панель администратора получена")
-    );
+    res.json(formatResponse(true, dashboardData, "Bol prijatý panel správcu"));
   });
 
   // Модерация вопросов
@@ -103,7 +101,11 @@ class AdminController {
     const questions = await questionService.getQuestions(options);
 
     res.json(
-      formatResponse(true, questions, "Очередь модерации вопросов получена")
+      formatResponse(
+        true,
+        questions,
+        "Bol dosiahnutý front na moderovanie otázok"
+      )
     );
   });
 
@@ -115,7 +117,11 @@ class AdminController {
     const pendingAnswers = await answerService.getPendingAnswers(options);
 
     res.json(
-      formatResponse(true, pendingAnswers, "Очередь модерации ответов получена")
+      formatResponse(
+        true,
+        pendingAnswers,
+        "Bol dosiahnutý front na moderovanie otázok"
+      )
     );
   });
 
@@ -130,7 +136,7 @@ class AdminController {
       formatResponse(
         true,
         pendingComments,
-        "Очередь модерации комментариев получена"
+        "Bol dosiahnutý front na moderovanie otázok"
       )
     );
   });
@@ -144,7 +150,7 @@ class AdminController {
     // Валидация ID
     if (!isValidObjectId(id)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID вопроса", {
+        formatResponse(false, null, "Neplatný formát ID otázky", {
           type: "VALIDATION_ERROR",
           field: "id",
         })
@@ -154,7 +160,7 @@ class AdminController {
     // Валидация статуса
     if (!Object.values(QUESTION_STATUS).includes(status)) {
       return res.status(400).json(
-        formatResponse(false, null, "Недопустимый статус вопроса", {
+        formatResponse(false, null, "Neplatný stav otázky", {
           type: "VALIDATION_ERROR",
           field: "status",
           allowedValues: Object.values(QUESTION_STATUS),
@@ -172,7 +178,7 @@ class AdminController {
       formatResponse(
         true,
         updatedQuestion,
-        `Статус вопроса изменен на "${status}"`
+        `Stav otázky bol zmenený na "${status}"`
       )
     );
   });
@@ -204,7 +210,7 @@ class AdminController {
 
     const users = await userService.getUsers(options);
 
-    res.json(formatResponse(true, users, "Список пользователей получен"));
+    res.json(formatResponse(true, users, "Bol prijatý zoznam používateľov"));
   });
 
   // Статистика форума
@@ -254,9 +260,7 @@ class AdminController {
       },
     };
 
-    res.json(
-      formatResponse(true, forumStatistics, "Статистика форума получена")
-    );
+    res.json(formatResponse(true, forumStatistics, "Prijaté štatistiky fóra"));
   });
 
   // История изменений ролей
@@ -267,7 +271,7 @@ class AdminController {
     // Валидация changedBy если передан
     if (changedBy && !isValidObjectId(changedBy)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID администратора", {
+        formatResponse(false, null, "Neplatný formát ID správcu", {
           type: "VALIDATION_ERROR",
           field: "changedBy",
         })
@@ -284,7 +288,7 @@ class AdminController {
     const roleChanges = await roleService.getAllRoleChanges(options);
 
     res.json(
-      formatResponse(true, roleChanges, "История изменений ролей получена")
+      formatResponse(true, roleChanges, "Bola prijatá história zmien rolí")
     );
   });
 
@@ -294,7 +298,7 @@ class AdminController {
 
     if (!["questions", "answers", "comments"].includes(contentType)) {
       return res.status(400).json(
-        formatResponse(false, null, "Недопустимый тип контента", {
+        formatResponse(false, null, "Neplatný typ obsahu", {
           type: "VALIDATION_ERROR",
           field: "contentType",
           allowedValues: ["questions", "answers", "comments"],
@@ -312,7 +316,9 @@ class AdminController {
       options
     );
 
-    res.json(formatResponse(true, analysis, "Анализ спам-контента выполнен"));
+    res.json(
+      formatResponse(true, analysis, "Analýza spamového obsahu bola dokončená")
+    );
   });
 
   // Анализ поведения пользователя
@@ -322,7 +328,7 @@ class AdminController {
     // Валидация ID
     if (!isValidObjectId(userId)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID пользователя", {
+        formatResponse(false, null, "Neplatný formát ID používateľa", {
           type: "VALIDATION_ERROR",
           field: "userId",
         })
@@ -332,7 +338,11 @@ class AdminController {
     const analysis = await spamDetectionService.analyzeUserBehavior(userId);
 
     res.json(
-      formatResponse(true, analysis, "Анализ поведения пользователя выполнен")
+      formatResponse(
+        true,
+        analysis,
+        "Analýza správania používateľov je dokončená"
+      )
     );
   });
 
@@ -345,7 +355,11 @@ class AdminController {
     );
 
     res.json(
-      formatResponse(true, statistics, "Статистика rate limiting получена")
+      formatResponse(
+        true,
+        statistics,
+        "Boli prijaté štatistiky obmedzujúce rýchlosť"
+      )
     );
   });
 
@@ -363,7 +377,9 @@ class AdminController {
 
     const violators = await rateLimitService.getUsersExceedingLimits(options);
 
-    res.json(formatResponse(true, violators, "Нарушители rate limit получены"));
+    res.json(
+      formatResponse(true, violators, "Porušovatelia limitu rýchlosti prijatí")
+    );
   });
 
   // Сброс rate limit для пользователя
@@ -375,7 +391,7 @@ class AdminController {
     // Валидация ID
     if (!isValidObjectId(userId)) {
       return res.status(400).json(
-        formatResponse(false, null, "Неверный формат ID пользователя", {
+        formatResponse(false, null, "Neplatný formát ID používateľa", {
           type: "VALIDATION_ERROR",
           field: "userId",
         })
@@ -388,7 +404,9 @@ class AdminController {
       action
     );
 
-    res.json(formatResponse(true, result, "Rate limits пользователя сброшены"));
+    res.json(
+      formatResponse(true, result, "Limity počtu používateľov boli resetované.")
+    );
   });
 
   // Массовая модерация контента
@@ -402,7 +420,7 @@ class AdminController {
         formatResponse(
           false,
           null,
-          "Поддерживается только модерация ответов и комментариев",
+          "Podporovaná je iba moderácia odpovedí a komentárov.",
           {
             type: "VALIDATION_ERROR",
             field: "contentType",
@@ -415,7 +433,7 @@ class AdminController {
     // Валидация списка ID
     if (!Array.isArray(itemIds) || itemIds.length === 0) {
       return res.status(400).json(
-        formatResponse(false, null, "Список ID элементов обязателен", {
+        formatResponse(false, null, "Zoznam ID prvkov je povinný.", {
           type: "VALIDATION_ERROR",
           field: "itemIds",
         })
@@ -424,7 +442,7 @@ class AdminController {
 
     if (itemIds.length > 50) {
       return res.status(400).json(
-        formatResponse(false, null, "Максимум 50 элементов за раз", {
+        formatResponse(false, null, "Maximálne 50 položiek naraz", {
           type: "VALIDATION_ERROR",
           field: "itemIds",
         })
@@ -435,7 +453,7 @@ class AdminController {
     for (const itemId of itemIds) {
       if (!isValidObjectId(itemId)) {
         return res.status(400).json(
-          formatResponse(false, null, `Неверный формат ID: ${itemId}`, {
+          formatResponse(false, null, `Neplatný formát ID: ${itemId}`, {
             type: "VALIDATION_ERROR",
             field: "itemIds",
           })
@@ -446,11 +464,16 @@ class AdminController {
     // Валидация действия
     if (!action || !["approve", "reject"].includes(action)) {
       return res.status(400).json(
-        formatResponse(false, null, "Действие должно быть approve или reject", {
-          type: "VALIDATION_ERROR",
-          field: "action",
-          allowedValues: ["approve", "reject"],
-        })
+        formatResponse(
+          false,
+          null,
+          "Akcia musí byť schválená alebo zamietnutá.",
+          {
+            type: "VALIDATION_ERROR",
+            field: "action",
+            allowedValues: ["approve", "reject"],
+          }
+        )
       );
     }
 
@@ -496,7 +519,7 @@ class AdminController {
             errors: errorCount,
           },
         },
-        `Массовая модерация завершена: ${successCount} успешно, ${errorCount} ошибок`
+        `Hromadná moderácia dokončená: ${successCount} úspešných, ${errorCount} chýb`
       )
     );
   });
@@ -505,7 +528,7 @@ class AdminController {
   getRoleTransitions = asyncHandler(async (req, res) => {
     const transitions = await roleService.getRoleTransitions();
 
-    res.json(formatResponse(true, transitions, "Переходы ролей получены"));
+    res.json(formatResponse(true, transitions, "Boli prijaté prechody rolí"));
   });
 }
 

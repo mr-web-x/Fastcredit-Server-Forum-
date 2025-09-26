@@ -7,13 +7,18 @@ import {
   logSecurityEvent,
 } from "../middlewares/logger.js";
 import emailService from "./emailService.js";
+import cryptoService from "./cryptoService.js";
 
 class VerificationService {
   // Генерация и отправка кода подтверждения email
   async sendEmailVerificationCode(email, requestIP = null) {
     try {
+      const hashedEmail = await cryptoService.hashData(email);
       // Проверяем существование пользователя
-      const user = await User.findOne({ email, provider: "local" });
+      const user = await User.findOne({
+        email: hashedEmail,
+        provider: "local",
+      });
 
       if (!user) {
         throw new Error("USER_NOT_FOUND");
@@ -30,7 +35,7 @@ class VerificationService {
 
       // Проверяем, есть ли активный код (не истекший)
       const existingCode = await VerificationCode.findActiveCode(
-        email,
+        hashedEmail,
         "email_verification"
       );
 
@@ -46,7 +51,7 @@ class VerificationService {
 
       // Создаем новый код (10 минут действия)
       const verificationCode = await VerificationCode.createVerificationCode(
-        email,
+        hashedEmail,
         "email_verification",
         10, // 10 минут
         requestIP
@@ -55,12 +60,9 @@ class VerificationService {
       console.log("verificationCode", verificationCode);
 
       try {
-        await emailService.sendEmail(
-          email,
-          "forumVerification",
-          "Fastcredit.sk",
-          { code: verificationCode.code }
-        );
+        await emailService.sendEmail(email, "code", "FastCredit", {
+          code: verificationCode.code,
+        });
       } catch (error) {
         console.log("EMAIL error", verificationCode.code);
       }
@@ -94,8 +96,13 @@ class VerificationService {
   // Подтверждение email по коду (ИСПРАВЛЕНО - БЫЛ ОБРЕЗАН!)
   async verifyEmailCode(email, code, requestIP = null) {
     try {
+      const hashedEmail = await cryptoService.hashData(email);
+
       // Ищем пользователя
-      const user = await User.findOne({ email, provider: "local" });
+      const user = await User.findOne({
+        email: hashedEmail,
+        provider: "local",
+      });
 
       if (!user) {
         logSecurityEvent(
@@ -118,7 +125,7 @@ class VerificationService {
 
       // Проверяем код
       const verificationResult = await VerificationCode.verifyCode(
-        email,
+        hashedEmail,
         code,
         "email_verification"
       );
@@ -168,8 +175,12 @@ class VerificationService {
   // Генерация и отправка кода для сброса пароля (ДОПИСАНО)
   async sendPasswordResetCode(email, requestIP = null) {
     try {
+      const hashedEmail = await cryptoService.hashData(email);
       // Проверяем существование пользователя
-      const user = await User.findOne({ email, provider: "local" });
+      const user = await User.findOne({
+        email: hashedEmail,
+        provider: "local",
+      });
 
       // Не раскрываем существование пользователя по соображениям безопасности
       if (!user) {
@@ -189,7 +200,7 @@ class VerificationService {
 
       // Проверяем, есть ли активный код
       const existingCode = await VerificationCode.findActiveCode(
-        email,
+        hashedEmail,
         "password_reset"
       );
 
@@ -213,14 +224,14 @@ class VerificationService {
 
       // Создаем новый код (15 минут для сброса пароля)
       const verificationCode = await VerificationCode.createVerificationCode(
-        email,
+        hashedEmail,
         "password_reset",
         15, // 15 минут
         requestIP
       );
 
       try {
-        await emailService.sendEmail(email, "passwordReset", "Fastcredit.sk", {
+        await emailService.sendEmail(email, "code", "FastCredit", {
           code: verificationCode.code,
         });
 
@@ -258,8 +269,13 @@ class VerificationService {
   // Проверка кода сброса пароля
   async verifyPasswordResetCode(email, code, requestIP = null) {
     try {
+      const hashedEmail = await cryptoService.hashData(email);
+
       // Ищем пользователя
-      const user = await User.findOne({ email, provider: "local" });
+      const user = await User.findOne({
+        email: hashedEmail,
+        provider: "local",
+      });
 
       if (!user) {
         logSecurityEvent(
@@ -273,7 +289,7 @@ class VerificationService {
 
       // Проверяем код
       const verificationResult = await VerificationCode.verifyCode(
-        email,
+        hashedEmail,
         code,
         "password_reset"
       );
@@ -318,8 +334,13 @@ class VerificationService {
   // Сброс пароля по коду (вместо токена)
   async resetPasswordWithCode(email, code, newPassword, requestIP = null) {
     try {
+      const hashedEmail = await cryptoService.hashData(email);
+
       // Ищем пользователя
-      const user = await User.findOne({ email, provider: "local" });
+      const user = await User.findOne({
+        email: hashedEmail,
+        provider: "local",
+      });
 
       if (!user) {
         throw new Error("USER_NOT_FOUND");
@@ -327,7 +348,7 @@ class VerificationService {
 
       // Проверяем код (он должен быть использован, но еще действительный)
       const verificationCode = await VerificationCode.findOne({
-        email: email.toLowerCase(),
+        email: hashedEmail,
         code: code.toString(),
         type: "password_reset",
         isUsed: true, // Код должен быть уже проверен в verifyPasswordResetCode
@@ -360,7 +381,7 @@ class VerificationService {
 
       // Удаляем все коды сброса пароля для этого email
       await VerificationCode.deleteMany({
-        email: email.toLowerCase(),
+        email: hashedEmail,
         type: "password_reset",
       });
 
@@ -392,7 +413,12 @@ class VerificationService {
   // Получение информации об активном коде
   async getActiveCodeInfo(email, type) {
     try {
-      const activeCode = await VerificationCode.findActiveCode(email, type);
+      const hashedEmail = await cryptoService.hashData(email);
+
+      const activeCode = await VerificationCode.findActiveCode(
+        hashedEmail,
+        type
+      );
 
       if (!activeCode) {
         return {
@@ -418,8 +444,10 @@ class VerificationService {
   // Отмена активного кода (если нужно)
   async cancelActiveCode(email, type, requestIP = null) {
     try {
+      const hashedEmail = await cryptoService.hashData(email);
+
       const result = await VerificationCode.deleteMany({
-        email: email.toLowerCase(),
+        email: hashedEmail,
         type,
         isUsed: false,
       });
@@ -449,7 +477,9 @@ class VerificationService {
   // Получение истории кодов для пользователя (для админов)
   async getCodeHistory(email, limit = 10) {
     try {
-      const history = await VerificationCode.getCodeHistory(email, limit);
+      const hashedEmail = await cryptoService.hashData(email);
+
+      const history = await VerificationCode.getCodeHistory(hashedEmail, limit);
 
       return {
         email,

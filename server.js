@@ -3,7 +3,11 @@ import app from "./app.js";
 import config from "./config/index.js";
 import database from "./utils/database.js";
 import { writeLog } from "./middlewares/logger.js";
+import { startSitemapCron } from "./scripts/sitemapCron.js";
 // import { startScheduler } from './utils/logCleanup.js';
+
+// Переменная для хранения cron задачи
+let sitemapCronTask = null;
 
 // Подключение к базе данных и запуск сервера
 async function startServer() {
@@ -31,11 +35,32 @@ async function startServer() {
           `Database: ${dbInfo.name} on ${dbInfo.host}:${dbInfo.port}`
         );
       }
+
+      // Инициализируем sitemap cron задачу
+      try {
+        sitemapCronTask = startSitemapCron();
+        writeLog("SUCCESS", "Sitemap cron job initialized successfully");
+      } catch (error) {
+        writeLog(
+          "ERROR",
+          `Failed to initialize sitemap cron: ${error.message}`
+        );
+      }
     });
 
     // Настройка graceful shutdown для сервера
     const gracefulShutdown = (signal) => {
       writeLog("INFO", `${signal} received. Closing HTTP server...`);
+
+      // Останавливаем sitemap cron задачу
+      if (sitemapCronTask) {
+        try {
+          sitemapCronTask.stop();
+          writeLog("INFO", "Sitemap cron job stopped");
+        } catch (error) {
+          writeLog("WARN", `Error stopping sitemap cron: ${error.message}`);
+        }
+      }
 
       server.close(async () => {
         writeLog("INFO", "HTTP server closed");

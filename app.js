@@ -13,6 +13,9 @@ import apiRoutes from "./routes/index.js";
 // Создаем приложение Express
 const app = express();
 
+// ДОБАВЬ ЭТО:
+app.set("trust proxy", true);
+
 // Базовые middleware для безопасности
 app.use(
   helmet({

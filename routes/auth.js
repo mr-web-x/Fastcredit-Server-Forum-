@@ -12,6 +12,7 @@ import {
 import { checkUserBan } from "../middlewares/banCheck.js";
 import { formatResponse } from "../utils/helpers.js";
 import { asyncHandler } from "../middlewares/errorHandler.js";
+import cryptoService from "../services/cryptoService.js";
 
 const router = express.Router();
 
@@ -308,6 +309,7 @@ if (process.env.NODE_ENV === "development") {
 
       try {
         const user = await User.findOne({ email });
+        await cryptoService.smartDecrypt(user);
         if (!user) {
           return res
             .status(404)
@@ -368,6 +370,8 @@ if (process.env.NODE_ENV === "development") {
           .sort({ createdAt: -1 })
           .limit(50);
 
+        await cryptoService.smartDecrypt(users);
+
         res.json(
           formatResponse(true, users, `Найдено ${users.length} пользователей`)
         );
@@ -391,6 +395,9 @@ if (process.env.NODE_ENV === "development") {
 
       try {
         const user = await User.findOne({ email, provider: "local" });
+
+        await cryptoService.smartDecrypt(user);
+
         if (!user) {
           return res
             .status(404)
@@ -428,6 +435,9 @@ if (process.env.NODE_ENV === "development") {
 
       try {
         const user = await User.findOne({ email });
+
+        await cryptoService.smartDecrypt(user);
+
         if (!user) {
           return res
             .status(404)

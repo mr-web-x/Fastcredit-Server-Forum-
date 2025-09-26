@@ -1,5 +1,35 @@
 // models/Answer.js
 import mongoose from "mongoose";
+import { SOCIAL_PLATFORMS, ANSWER_ACTIONS } from "../utils/constants.js";
+
+const socialPostsSchema = new mongoose.Schema({
+  platform: {
+    type: String, // Прибрано лапки
+    default: "",
+    enum: Object.values(SOCIAL_PLATFORMS),
+    required: true,
+  },
+  postId: {
+    type: String, // Прибрано лапки
+    required: true, // Додано true
+  },
+});
+
+const answerActionSchema = new mongoose.Schema({
+  action: {
+    type: String,
+    enum: Object.values(ANSWER_ACTIONS),
+    required: true,
+  },
+  info: {
+    type: String,
+    default: "Action performed",
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
 
 const answerSchema = new mongoose.Schema(
   {
@@ -55,6 +85,8 @@ const answerSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    socialPosts: [socialPostsSchema],
+    actions: [answerActionSchema],
   },
   {
     timestamps: true,
@@ -86,6 +118,11 @@ answerSchema.methods.approve = async function (moderatorId, comment = null) {
   this.moderatedAt = new Date();
   this.moderationComment = comment;
 
+  this.actions.push({
+    action: ANSWER_ACTIONS.APPROVE,
+    info: `Answer approved by moderator${comment ? ": " + comment : ""}`,
+  });
+
   // Обновляем статус вопроса и счетчик ответов
   await mongoose.model("Question").findByIdAndUpdate(this.questionId, {
     status: "answered",
@@ -105,6 +142,12 @@ answerSchema.methods.reject = async function (moderatorId, comment = null) {
   this.moderatedBy = moderatorId;
   this.moderatedAt = new Date();
   this.moderationComment = comment;
+
+  this.actions.push({
+    action: ANSWER_ACTIONS.REJECT,
+    info: `Answer rejected by moderator${comment ? ": " + comment : ""}`,
+  });
+
   return await this.save();
 };
 
@@ -191,6 +234,16 @@ answerSchema.pre("deleteOne", { document: true }, async function () {
     await mongoose
       .model("Question")
       .findByIdAndUpdate(this.questionId, { hasAcceptedAnswer: false });
+  }
+});
+
+answerSchema.pre("save", function () {
+  // Додаємо CREATE action тільки для нових документів
+  if (this.isNew && this.actions.length === 0) {
+    this.actions.push({
+      action: ANSWER_ACTIONS.CREATE,
+      info: "Answer created",
+    });
   }
 });
 

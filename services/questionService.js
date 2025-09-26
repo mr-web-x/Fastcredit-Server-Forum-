@@ -10,6 +10,7 @@ import {
   generateUniqueSlug,
   createPaginationResponse,
 } from "../utils/helpers.js";
+import cryptoService from "./cryptoService.js";
 
 class QuestionService {
   // Создание нового вопроса
@@ -47,6 +48,8 @@ class QuestionService {
         "firstName lastName email role avatar"
       );
 
+      await cryptoService.smartDecrypt(populatedQuestion);
+
       logUserAction(
         authorId,
         "QUESTION_CREATED",
@@ -71,6 +74,8 @@ class QuestionService {
       if (!question) {
         throw new Error("Question not found");
       }
+
+      await cryptoService.smartDecrypt(question);
 
       // Увеличиваем просмотры (но не для автора)
       if (!viewerId || viewerId.toString() !== question.author._id.toString()) {
@@ -139,6 +144,8 @@ class QuestionService {
           .limit(limit),
         Question.countDocuments(query),
       ]);
+
+      await cryptoService.smartDecrypt(questions);
 
       return createPaginationResponse(questions, total, page, limit);
     } catch (error) {
@@ -297,6 +304,8 @@ class QuestionService {
       const total = countResult[0]?.total || 0;
       const questions = questionsResult;
 
+      await cryptoService.smartDecrypt(questions);
+
       return createPaginationResponse(questions, total, page, limit);
     } catch (error) {
       logError(error, "QuestionService.getQuestionsWithAnswersAggregation");
@@ -320,6 +329,8 @@ class QuestionService {
           .limit(limit),
         Question.countDocuments(query),
       ]);
+
+      await cryptoService.smartDecrypt(questions);
 
       return createPaginationResponse(questions, total, page, limit);
     } catch (error) {
@@ -362,10 +373,14 @@ class QuestionService {
         `Updated question: ${question.slug}`
       );
 
-      return await Question.findById(questionId).populate(
+      const resultQuestion = await Question.findById(questionId).populate(
         "author",
-        "firstName lastName email role avatar"
+        "firstName lastName originalEmail role avatar"
       );
+
+      await cryptoService.smartDecrypt(resultQuestion);
+
+      return resultQuestion;
     } catch (error) {
       logError(error, "QuestionService.updateQuestion", userId);
       throw error;
@@ -637,6 +652,8 @@ class QuestionService {
         Question.countDocuments(query),
       ]);
 
+      await cryptoService.smartDecrypt(questions);
+
       return createPaginationResponse(questions, total, page, limit);
     } catch (error) {
       logError(error, "QuestionService.getUserQuestions");
@@ -660,6 +677,8 @@ class QuestionService {
         .populate("author", "firstName lastName email role avatar")
         .sort({ [sortBy]: -1, views: -1 })
         .limit(limit);
+
+      await cryptoService.smartDecrypt(questions);
 
       return questions;
     } catch (error) {

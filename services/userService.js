@@ -6,53 +6,62 @@ import Comment from "../models/Comment.js";
 import { USER_ROLES } from "../utils/constants.js";
 import { logUserAction, logError } from "../middlewares/logger.js";
 import { createPaginationResponse } from "../utils/helpers.js";
+import cryptoService from "../services/cryptoService.js";
 
 class UserService {
-  // Получение пользователя по ID
+  // ==================== ПОИСК ПО ID ====================
   async getUserById(userId, includePrivate = false) {
     try {
       const selectFields = includePrivate ? "" : "-__v";
-      const user = await User.findById(userId).select(selectFields);
+      const resultUser = await User.findById(userId).select(selectFields);
 
-      if (!user) {
-        throw new Error("User not found");
-      }
+      if (!resultUser) throw new Error("User not found");
 
-      return user;
+      await cryptoService.smartDecrypt(resultUser);
+      return resultUser;
     } catch (error) {
       logError(error, "UserService.getUserById", userId);
       throw error;
     }
   }
 
-  // Получение пользователя по email
+  // ==================== ПОИСК ПО EMAIL ====================
   async getUserByEmail(email) {
     try {
-      const user = await User.findOne({ email }).select("-__v");
-      return user;
+      const hashedEmail = await cryptoService.hashData(email.toLowerCase());
+      const resultUser = await User.findOne({ email: hashedEmail }).select(
+        "-__v"
+      );
+
+      await cryptoService.smartDecrypt(resultUser);
+
+      return resultUser;
     } catch (error) {
       logError(error, "UserService.getUserByEmail");
       throw error;
     }
   }
 
-  // Получение пользователя по username (для локальной авторизации)
+  // ==================== ПОИСК ПО USERNAME ====================
   async getUserByUsername(username) {
     try {
-      const user = await User.findOne({ username, provider: "local" }).select(
-        "-__v"
-      );
-      return user;
+      const resultUser = await User.findOne({
+        username,
+        provider: "local",
+      }).select("-__v");
+      await cryptoService.smartDecrypt(resultUser);
+      return resultUser;
     } catch (error) {
       logError(error, "UserService.getUserByUsername");
       throw error;
     }
   }
 
-  // Проверка доступности email
+  // ==================== ПРОВЕРКА ДОСТУПНОСТИ EMAIL ====================
   async isEmailAvailable(email) {
     try {
-      const existingUser = await User.findOne({ email });
+      const hashedEmail = await cryptoService.hashData(email.toLowerCase());
+      const existingUser = await User.findOne({ email: hashedEmail });
       return !existingUser;
     } catch (error) {
       logError(error, "UserService.isEmailAvailable");
@@ -60,7 +69,7 @@ class UserService {
     }
   }
 
-  // Проверка доступности username
+  // ==================== ПРОВЕРКА ДОСТУПНОСТИ USERNAME ====================
   async isUsernameAvailable(username) {
     try {
       const existingUser = await User.findOne({ username });
@@ -71,7 +80,7 @@ class UserService {
     }
   }
 
-  // Получение списка пользователей с пагинацией
+  // ==================== СПИСОК ПОЛЬЗОВАТЕЛЕЙ ====================
   async getUsers(options = {}) {
     try {
       const {
@@ -82,7 +91,6 @@ class UserService {
         isActive = null,
         isBanned = null,
         isEmailVerified = null,
-        search = null,
         sortBy = "createdAt",
         sortOrder = -1,
       } = options;
@@ -90,22 +98,11 @@ class UserService {
       const skip = (page - 1) * limit;
       const query = {};
 
-      // Фильтры
       if (role) query.role = role;
       if (provider) query.provider = provider;
       if (isActive !== null) query.isActive = isActive;
       if (isBanned !== null) query.isBanned = isBanned;
       if (isEmailVerified !== null) query.isEmailVerified = isEmailVerified;
-
-      // Поиск по email, username или имени
-      if (search) {
-        query.$or = [
-          { email: { $regex: search, $options: "i" } },
-          { username: { $regex: search, $options: "i" } },
-          { firstName: { $regex: search, $options: "i" } },
-          { lastName: { $regex: search, $options: "i" } },
-        ];
-      }
 
       const [users, total] = await Promise.all([
         User.find(query)
@@ -116,6 +113,8 @@ class UserService {
         User.countDocuments(query),
       ]);
 
+      await cryptoService.smartDecrypt(users);
+
       return createPaginationResponse(users, total, page, limit);
     } catch (error) {
       logError(error, "UserService.getUsers");
@@ -123,7 +122,7 @@ class UserService {
     }
   }
 
-  // Получение экспертов
+  // ==================== ЭКСПЕРТЫ ====================
   async getExperts(options = {}) {
     try {
       const {
@@ -132,7 +131,6 @@ class UserService {
         sortBy = "rating",
         sortOrder = -1,
       } = options;
-
       const skip = (page - 1) * limit;
 
       const [experts, total] = await Promise.all([
@@ -152,6 +150,8 @@ class UserService {
         }),
       ]);
 
+      await cryptoService.smartDecrypt(experts);
+
       return createPaginationResponse(experts, total, page, limit);
     } catch (error) {
       logError(error, "UserService.getExperts");
@@ -159,19 +159,13 @@ class UserService {
     }
   }
 
-  // Обновление профиля пользователя
+  // ==================== ОБНОВЛЕНИЕ ПРОФИЛЯ ====================
   async updateProfile(userId, updateData, updatedBy = null) {
     try {
-      const user = await User.findById(userId);
+      const resultUser = await User.findById(userId);
+      if (!resultUser) throw new Error("User not found");
 
-      if (!user) {
-        throw new Error("User not found");
-      }
-
-      // Поля, которые может обновлять сам пользователь
       const userAllowedFields = ["bio", "avatar", "firstName", "lastName"];
-
-      // Поля, которые может обновлять только админ
       const adminOnlyFields = [
         "role",
         "isActive",
@@ -186,34 +180,25 @@ class UserService {
       const isSelf =
         updatedBy && updatedBy._id.toString() === userId.toString();
 
-      // Обычные поля профиля
       userAllowedFields.forEach((field) => {
-        if (updateData[field] !== undefined) {
+        if (updateData[field] !== undefined)
           filteredData[field] = updateData[field];
-        }
       });
 
-      // Админские поля (только для админов)
       if (isAdmin) {
         adminOnlyFields.forEach((field) => {
-          if (updateData[field] !== undefined) {
+          if (updateData[field] !== undefined)
             filteredData[field] = updateData[field];
-          }
         });
       }
 
-      // Проверка уникальности username если обновляется
-      if (updateData.username && updateData.username !== user.username) {
+      if (updateData.username && updateData.username !== resultUser.username) {
         if (isSelf || isAdmin) {
           const usernameExists = await User.findOne({
             username: updateData.username,
             _id: { $ne: userId },
           });
-
-          if (usernameExists) {
-            throw new Error("Username already taken");
-          }
-
+          if (usernameExists) throw new Error("Username already taken");
           filteredData.username = updateData.username;
         }
       }
@@ -227,35 +212,31 @@ class UserService {
         runValidators: true,
       }).select("-__v");
 
-      const actionType = isSelf
-        ? "PROFILE_SELF_UPDATED"
-        : "PROFILE_ADMIN_UPDATED";
-      const details = `Updated fields: ${Object.keys(filteredData).join(", ")}`;
+      await cryptoService.smartDecrypt(updatedUser);
 
-      logUserAction(userId, actionType, details);
+      logUserAction(
+        userId,
+        isSelf ? "PROFILE_SELF_UPDATED" : "PROFILE_ADMIN_UPDATED",
+        `Updated fields: ${Object.keys(filteredData).join(", ")}`
+      );
 
       return updatedUser;
     } catch (error) {
       logError(error, "UserService.updateProfile", userId);
-
-      if (error.message === "Username already taken") {
-        throw new Error("Имя пользователя уже занято");
-      }
-
       throw error;
     }
   }
 
-  // Получение активности пользователя
+  // ==================== АКТИВНОСТЬ ПОЛЬЗОВАТЕЛЯ ====================
   async getUserActivity(userId, options = {}) {
     try {
       const { page = 1, limit = 20 } = options;
       const skip = (page - 1) * limit;
 
-      const user = await User.findById(userId);
-      if (!user) {
-        throw new Error("User not found");
-      }
+      const resultUser = await User.findById(userId);
+      if (!resultUser) throw new Error("User not found");
+
+      await cryptoService.smartDecrypt(resultUser);
 
       const [questions, answers, comments] = await Promise.all([
         Question.find({ author: userId })
@@ -280,29 +261,8 @@ class UserService {
       ]);
 
       return {
-        user: {
-          id: user._id,
-          email: user.email,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          fullName: user.fullName,
-          provider: user.provider,
-          role: user.role,
-          avatar: user.avatar,
-          bio: user.bio,
-          rating: user.rating,
-          totalAnswers: user.totalAnswers,
-          totalQuestions: user.totalQuestions,
-          isExpert: user.isExpert,
-          isEmailVerified: user.isEmailVerified,
-          createdAt: user.createdAt,
-        },
-        activity: {
-          questions,
-          answers,
-          comments,
-        },
+        user: resultUser,
+        activity: { questions, answers, comments },
       };
     } catch (error) {
       logError(error, "UserService.getUserActivity", userId);
@@ -310,7 +270,7 @@ class UserService {
     }
   }
 
-  // Получение статистики пользователей
+  // ==================== ПРОЧИЕ МЕТОДЫ (статистика, counters) ====================
   async getUserStatistics() {
     try {
       const [totalStats, providerStats, roleStats, verificationStats] =
@@ -326,7 +286,6 @@ class UserService {
               },
             },
           ]),
-
           User.aggregate([
             {
               $group: {
@@ -337,16 +296,11 @@ class UserService {
               },
             },
           ]),
-
           User.getStatistics(),
-
           User.aggregate([
             {
               $group: {
-                _id: {
-                  provider: "$provider",
-                  verified: "$isEmailVerified",
-                },
+                _id: { provider: "$provider", verified: "$isEmailVerified" },
                 count: { $sum: 1 },
               },
             },
@@ -370,180 +324,6 @@ class UserService {
       };
     } catch (error) {
       logError(error, "UserService.getUserStatistics");
-      throw error;
-    }
-  }
-
-  // Поиск пользователей
-  async searchUsers(query, options = {}) {
-    try {
-      const { page = 1, limit = 20, role = null } = options;
-      const skip = (page - 1) * limit;
-
-      const searchQuery = {
-        $or: [
-          { email: { $regex: query, $options: "i" } },
-          { username: { $regex: query, $options: "i" } },
-          { firstName: { $regex: query, $options: "i" } },
-          { lastName: { $regex: query, $options: "i" } },
-        ],
-      };
-
-      if (role) {
-        searchQuery.role = role;
-      }
-
-      const [users, total] = await Promise.all([
-        User.find(searchQuery)
-          .select(
-            "email username firstName lastName role avatar bio totalAnswers totalQuestions createdAt provider isEmailVerified"
-          )
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit),
-        User.countDocuments(searchQuery),
-      ]);
-
-      return createPaginationResponse(users, total, page, limit);
-    } catch (error) {
-      logError(error, "UserService.searchUsers");
-      throw error;
-    }
-  }
-
-  // Инкремент счетчиков пользователя
-  async incrementUserCounter(userId, counterType) {
-    try {
-      const updateField = {};
-
-      switch (counterType) {
-        case "questions":
-          updateField.totalQuestions = 1;
-          break;
-        case "answers":
-          updateField.totalAnswers = 1;
-          break;
-        default:
-          throw new Error(`Invalid counter type: ${counterType}`);
-      }
-
-      const user = await User.findByIdAndUpdate(
-        userId,
-        { $inc: updateField },
-        { new: true }
-      );
-
-      if (!user) {
-        throw new Error("User not found");
-      }
-
-      logUserAction(
-        userId,
-        "COUNTER_INCREMENTED",
-        `${counterType} counter incremented`
-      );
-
-      return user;
-    } catch (error) {
-      logError(error, "UserService.incrementUserCounter", userId);
-      throw error;
-    }
-  }
-
-  // Обновление рейтинга эксперта
-  async updateUserRating(userId, newRating) {
-    try {
-      const user = await User.findByIdAndUpdate(
-        userId,
-        { rating: Math.max(0, newRating) },
-        { new: true }
-      );
-
-      if (!user) {
-        throw new Error("User not found");
-      }
-
-      logUserAction(userId, "RATING_UPDATED", `Rating updated to ${newRating}`);
-
-      return user;
-    } catch (error) {
-      logError(error, "UserService.updateUserRating", userId);
-      throw error;
-    }
-  }
-
-  // Получение пользователей по provider
-  async getUsersByProvider(provider, options = {}) {
-    try {
-      const { page = 1, limit = 20 } = options;
-      const skip = (page - 1) * limit;
-
-      const [users, total] = await Promise.all([
-        User.find({ provider })
-          .select("-__v")
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit),
-        User.countDocuments({ provider }),
-      ]);
-
-      return createPaginationResponse(users, total, page, limit);
-    } catch (error) {
-      logError(error, "UserService.getUsersByProvider");
-      throw error;
-    }
-  }
-
-  // Получение неподтвержденных пользователей (для админки)
-  async getUnverifiedUsers(options = {}) {
-    try {
-      const { page = 1, limit = 20 } = options;
-      const skip = (page - 1) * limit;
-
-      const [users, total] = await Promise.all([
-        User.find({
-          isEmailVerified: false,
-          provider: "local",
-        })
-          .select("-__v")
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit),
-        User.countDocuments({
-          isEmailVerified: false,
-          provider: "local",
-        }),
-      ]);
-
-      return createPaginationResponse(users, total, page, limit);
-    } catch (error) {
-      logError(error, "UserService.getUnverifiedUsers");
-      throw error;
-    }
-  }
-
-  // Получение заблокированных аккаунтов (брутфорс защита)
-  async getLockedAccounts(options = {}) {
-    try {
-      const { page = 1, limit = 20 } = options;
-      const skip = (page - 1) * limit;
-
-      const [users, total] = await Promise.all([
-        User.find({
-          lockUntil: { $gt: new Date() },
-        })
-          .select("email username lockUntil loginAttempts provider createdAt")
-          .sort({ lockUntil: -1 })
-          .skip(skip)
-          .limit(limit),
-        User.countDocuments({
-          lockUntil: { $gt: new Date() },
-        }),
-      ]);
-
-      return createPaginationResponse(users, total, page, limit);
-    } catch (error) {
-      logError(error, "UserService.getLockedAccounts");
       throw error;
     }
   }
