@@ -138,54 +138,12 @@ app.use((error, req, res, next) => {
     )}`
   );
 
-  // Mongoose validation errors
-  if (error.name === "ValidationError") {
-    const errors = Object.values(error.errors).map((err) => err.message);
-    return res.status(400).json({
-      success: false,
-      error: "Validation Error",
-      message: "Ошибка валидации данных",
-      details: errors,
-    });
-  }
-
-  // Mongoose duplicate key error
-  if (error.code === 11000) {
-    const field = Object.keys(error.keyValue)[0];
-    return res.status(409).json({
-      success: false,
-      error: "Duplicate Error",
-      message: `${field} уже существует`,
-      field,
-    });
-  }
-
-  // JWT errors
-  if (error.name === "JsonWebTokenError") {
-    return res.status(401).json({
-      success: false,
-      error: "Invalid Token",
-      message: "Недействительный токен",
-    });
-  }
-
-  if (error.name === "TokenExpiredError") {
-    return res.status(401).json({
-      success: false,
-      error: "Token Expired",
-      message: "Токен истек",
-    });
-  }
-
   // Default error
   const statusCode = error.statusCode || error.status || 500;
   res.status(statusCode).json({
     success: false,
-    error: error.name || "Internal Server Error",
-    message:
-      config.NODE_ENV === "production"
-        ? "Произошла внутренняя ошибка сервера"
-        : error.message,
+    error: error.name || "Interná chyba servera",
+    message: error.message,
     ...(config.NODE_ENV !== "production" && { stack: error.stack }),
   });
 });
